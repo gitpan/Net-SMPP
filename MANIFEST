@@ -1,0 +1,12 @@
+Changes
+README
+MANIFEST
+Makefile.PL
+SMPP.pm
+test.pl
+smsc.pl
+esme.pl
+bind-hammer.pl
+esme-hammer.pl
+sendmessage.pl
+esme-rec.pl
