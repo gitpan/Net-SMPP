@@ -15,8 +15,12 @@
 # 11.12.2001, fixed encode_deliver_v4 to encode_deliver_sm_v4, bug reported
 #            by Cristina Del Amo (Cristina.delAmo@vodafone-us.com), --Sampo
 # 4.1.2002,  Fixed enquiry_link to enquire_link --Sampo
+# 10.1.2002, applied big patch by Lars Thegler <lars@@thegler_.dk> to
+#            make pack and unpack templates perl5.005_03 compatible. --Sampo
+#            Caught bugs in decode_outbind_v34(), encode_query_sm(),
+#            encode_query_sm_resp() and replace_sm() --Sampo
 #
-# $Id: SMPP.pm,v 1.18 2002/01/06 01:56:21 sampo Exp $
+# $Id: SMPP.pm,v 1.19 2002/01/11 04:50:28 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -30,17 +34,15 @@ package Net::SMPP;
 
 require 5.005;
 use strict;
-use warnings;
 use Socket;
 use Symbol;
 use Carp;
 use IO::Socket;
-use IO::Socket::INET;
 use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '0.94';
+$VERSION = '0.95';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -147,7 +149,7 @@ use constant CMD_bind_transceiver_resp => 0x80000009;  # v3.4
 use constant CMD_delivery_receipt      => 0x00000009;  # v4     #4
 use constant CMD_delivery_receipt_resp => 0x80000009;  # v4     #4
 use constant CMD_enquire_link_v4       => 0x0000000a;  #4
-use constant CMD_enquire_link_v4_resp  => 0x8000000a;  #4
+use constant CMD_enquire_link_resp_v4  => 0x8000000a;  #4
 use constant CMD_outbind               => 0x0000000b;
 use constant CMD_enquire_link          => 0x00000015;
 use constant CMD_enquire_link_resp     => 0x80000015;
@@ -368,13 +370,13 @@ use constant param_tab => {
     # Aka PDC_Destination_Subaddr, "\x01\x00\x00" 0x010000 undefined #4> (J-Phone) <4#
     0x0204 => { name => 'user_message_reference', technology => 'Generic', },
     0x0205 => { name => 'user_response_code', technology => 'CDMA,TDMA', },
-    0x020a => { name => 'source_port',        technology => 'Generic', },
-    0x020b => { name => 'destination_port',   technology => 'Generic', },
+    0x020a => { name => 'source_port',        technology => 'WAP', },
+    0x020b => { name => 'destination_port',   technology => 'WAP', },
     0x020c => { name => 'sar_msg_ref_num',    technology => 'Generic', },
     0x020d => { name => 'language_indicator', technology => 'CDMA,TDMA', },
     0x020e => { name => 'sar_total_segments', technology => 'Generic', },
     0x020f => { name => 'sar_segment_seqnum', technology => 'Generic', },
-    0x0210 => { name => 'SC_interface_version',  technology => 'Generic', },
+    0x0210 => { name => 'sc_interface_version',  technology => 'Generic', },  # bind_*_resp
 
     0x0301 => { name => 'CC_CBN', technology => 'V4', }, # V4ext p.70  Call Back Number  #4
     0x0302 => { name => 'callback_num_pres_ind', technology => 'TDMA', },  # V4ext p.71  CC_CBNPresentation #4
@@ -400,7 +402,7 @@ use constant param_tab => {
     # "\x00"  0x00 = Unknown, 0x01 = english, 0x02 = french, 0x03 = spanish
     0x130c => { name => 'alert_on_message_delivery', technology => 'CDMA', },
     0x1380 => { name => 'its_reply_type',   technology => 'CDMA', },
-    0x1383 => { name => 'its_session_info', technology => 'CDMA', },
+    0x1383 => { name => 'its_session_info', technology => 'CDMA Korean [KORITS]', },
 
     0x1101 => { name => 'PDC_MessageClass', technology => '? (J-Phone)', },  # V4ext p.75  #4
     # "\x20\x00"  0x2000   Sky Mail (service name of J-Phone SMS)  #4
@@ -458,10 +460,16 @@ sub hexdump {
     return $data;
 }
 
+### The optional values are encoded as TLV (tag, len, value) triplets where
+### tag and length are 16 bit network byteorder and value is as much as
+### the length says (length does not include tag or length of the length
+### field itself).
+
 sub decode_optional_params {
     my ($pdu, $offset) = @_;    
     while ($offset < length($pdu->{data})) {
-	my ($tag, $val) = unpack 'nn/a*', substr($pdu->{data}, $offset);
+	my ($tag, $len) = unpack 'nn', substr($pdu->{data}, $offset);
+	my ($val) = unpack "a$len", substr($pdu->{data}, $offset+4);
 	$pdu->{$tag} = $val;   # value is always accessible via numeric tag
 	if (defined param_tab->{$tag}) {
 	    $pdu->{param_tab->{$tag}->{name}} = $val;  # assign symbolic name
@@ -479,9 +487,9 @@ sub encode_optional_params {
 	my $val = shift;
 	next if !defined $opt_param;  # skip mandatory parameters that were taken
 	if ($param_by_name{$opt_param}) {
-	    $data .= pack 'nn/a*', $param_by_name{$opt_param}, $val;
+	    $data .= pack 'nna*', $param_by_name{$opt_param}, length($val), $val;
 	} elsif ($opt_param =~ /^\d+$/) {  # specification by numeric tag
-	    $data .= pack 'nn/a*', $opt_param, $val;
+	    $data .= pack 'nna*', $opt_param, , length($val), $val;
 	} else {
 	    warn "Unknown optional parameter `$opt_param', skipping";
 	}
@@ -604,11 +612,16 @@ sub enquire_link {
     $me->req_backend(CMD_enquire_link, '', @_);
 }
 
+sub enquire_link_resp {
+    my $me = $_[0];
+    return $me->resp_backend(${*$me}{smpp_version}==0x40?CMD_enquire_link_resp_v4:CMD_enquire_link_resp, '', @_); #4
+    $me->resp_backend(CMD_enquire_link_resp, '', @_);
+}
+
 sub generic_nack          { $_[0]->resp_backend(CMD_generic_nack, '', @_) }
 sub unbind_resp           { $_[0]->resp_backend(CMD_unbind_resp, '', @_) }
 sub replace_sm_resp       { $_[0]->resp_backend(CMD_replace_sm_resp, '', @_) }
 sub cancel_sm_resp        { $_[0]->resp_backend(CMD_cancel_sm_resp, '', @_) }
-sub enquire_link_resp     { $_[0]->resp_backend(CMD_enquire_link_resp, '', @_) }
 sub delivery_receipt_resp { $_[0]->resp_backend(CMD_delivery_receipt_resp, '', @_) }
 
 ###
@@ -649,6 +662,7 @@ sub encode_bind {
 	elsif ($_[$i] eq 'password')  { $password = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'system_type')   { $system_type = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'interface_version') { $interface_version = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'interface_type') { $interface_version = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'addr_ton')  { $addr_ton = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'addr_npi')  { $addr_npi = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'address_range') { $address_range = splice @_,$i,2,undef,undef; }
@@ -730,9 +744,9 @@ sub bind_receiver_resp    { $_[0]->resp_backend(CMD_bind_receiver_resp,    &enco
 sub decode_outbind_v34 {
     my $pdu = shift;
     my $me = shift;
-    ($pdu->{system_id}, $pdu->{password}) = unpack 'Z*', $pdu->{data};
+    ($pdu->{system_id}) = unpack 'Z*', $pdu->{data};
     my $len = length($pdu->{system_id}) + 1;
-    ($pdu->{system_id}, $pdu->{password}) = unpack 'Z*', substr($pdu->{data}, $len);
+    ($pdu->{password}) = unpack 'Z*', substr($pdu->{data}, $len);
     return $len + length($pdu->{password}) + 1;
 }
 
@@ -787,16 +801,19 @@ sub decode_submit_v34 {
     ($pdu->{validity_period}) = unpack 'Z*', substr($pdu->{data}, $len);
     $len += length($pdu->{validity_period}) + 1;
 
+    my $sm_length;
     ($pdu->{registered_delivery}, # 13
      $pdu->{replace_if_present_flag}, # 14
      $pdu->{data_coding},       # 15
      $pdu->{sm_default_msg_id}, # 16
-     #undef,                     # 17  sm_length
-     $pdu->{short_message}      # 18
+     $sm_length,                # 17
 #                         1
 #                12345678901234567 8
-     ) = unpack 'CCCCC/a*', substr($pdu->{data}, $len);
-    return $len + 1 + 1 + 1 + 1 + 1 + length($pdu->{short_message});
+     ) = unpack 'CCCCC', substr($pdu->{data}, $len);
+    $len += 1 + 1 + 1 + 1 + 1;
+    ($pdu->{short_message}      # 18
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
+    return $len + $sm_length;
 }
 
 sub encode_submit_v34 {
@@ -851,13 +868,13 @@ sub encode_submit_v34 {
     $sm_default_msg_id = ${*$me}{sm_default_msg_id} if !defined $sm_default_msg_id;
     $short_message = '' if !defined $short_message;
 
-    return pack('Z*CCZ*CCZ*CCCZ*Z*CCCCC/a*',
+    return pack('Z*CCZ*CCZ*CCCZ*Z*CCCCCa*',
 		$service_type, $source_addr_ton, $source_addr_npi, $source_addr,
 		$dest_addr_ton, $dest_addr_npi, $destination_addr,
 		$esm_class, $protocol_id, $priority_flag,
 		$schedule_delivery_time, $validity_period,
 		$registered_delivery, $replace_if_present_flag, $data_coding,
-		$sm_default_msg_id, $short_message, );
+		$sm_default_msg_id, length($short_message), $short_message, );
 }
 
 #4#cut
@@ -901,16 +918,20 @@ sub decode_submit_v4 {
     $len += 1 + 1 + length($pdu->{schedule_delivery_time}) + 1;
     warn "d decode_submit $len: ".hexdump(substr($pdu->{data}, $len)) if $trace;
 
+    my $sm_length;
     ($pdu->{validity_period},        # 12 n  v4: n.b. this is now short instead of Cstr
      $pdu->{registered_delivery},    # 13 C
      $pdu->{data_coding},            # 14 C
      $pdu->{sm_default_msg_id},      # 15 C
-     #undef,                         # 16 n  sm_length
-     $pdu->{short_message}           # 17 a
+     $sm_length,                     # 16 n
+
 #                   1
 #                7890123456 7
-     ) = unpack 'nCCCn/a*', substr($pdu->{data}, $len);
-    $len += 2 + 1 + 1 + 1 + 2 + length($pdu->{short_message});
+     ) = unpack 'nCCCn', substr($pdu->{data}, $len);
+    $len += 2 + 1 + 1 + 1 + 2;
+    ($pdu->{short_message}           # 17 a
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
+    $len += $sm_length;
     warn "e decode_submit ($pdu->{short_message}) $len: ".hexdump(substr($pdu->{data}, $len)) if $trace;
 
     $pdu->{service_type} = $pdu->{message_class};   # compat v34
@@ -1012,11 +1033,11 @@ sub encode_submit_v4 {
     return pack('nCCZ*N',
 		$message_class, $source_addr_ton, $source_addr_npi, $source_addr,
 		scalar(@destination_addr)) . $addr_data
-		    . pack('CZ*CCZ*nCCCn/a*',
+		    . pack('CZ*CCZ*nCCCna*',
 			   $messaging_mode, $msg_reference, $telematic_interworking,
 			   $priority_level, $schedule_delivery_time, $validity_period,
 			   $registered_delivery_mode, $data_coding,
-			   $sm_default_msg_id, $short_message, )
+			   $sm_default_msg_id, length($short_message), $short_message, )
     # . $pdc_multipartmessage  # *** Felix
     ;
 }
@@ -1067,10 +1088,14 @@ sub decode_deliver_sm_v4 {
     # $pdu->{submit_time_stamp}) = unpack 'nCCZ*', substr($pdu->{data}, $len);
     #$len += 2 + 1 + 1 + length($pdu->{submit_time_stamp}) + 1;
 
+    my $sm_length;
     ($pdu->{data_coding},       # 15 C
-     #undef,                     # 17 n  sm_length
-     $pdu->{short_message}) = unpack 'Cn/a*', substr($pdu->{data}, $len);
-    $len += 1 + 2 + length($pdu->{short_message});
+     $sm_length,                # 17 n
+     ) = unpack 'Cn', substr($pdu->{data}, $len);
+    $len += 1 + 2;
+    ($pdu->{short_message}
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
+    $len += $sm_length;
 
     $pdu->{esm_class} = $pdu->{message_class};
     $pdu->{protocol_id} = $pdu->{telematic_interworking};
@@ -1125,11 +1150,11 @@ sub encode_deliver_sm_v4 {
     $data_coding = ${*$me}{data_coding} if !defined $data_coding;
     $short_message = '' if !defined $short_message;
     
-    return pack('CCZ*CCZ*Z*nCCZ*Cn/a*',
+    return pack('CCZ*CCZ*Z*nCCZ*Cna*',
 		$source_addr_ton, $source_addr_npi, $source_addr,
 		$dest_addr_ton, $dest_addr_npi, $destination_addr,
 		$msg_reference, $message_class, $telematic_interworking, $priority_level,
-		$schedule_delivery_time, $data_coding, $short_message, );
+		$schedule_delivery_time, $data_coding, length($short_message),$short_message, );
 }
 #4#end
 
@@ -1236,18 +1261,20 @@ sub decode_submit_multi {
     ($pdu->{validity_period}) = unpack 'Z*', substr($pdu->{data}, $len);
     $len += length($pdu->{validity_period}) + 1;
 
+    my $sm_length;
     ($pdu->{registered_delivery}, # 13
      $pdu->{replace_if_present_flag}, # 14
      $pdu->{data_coding},       # 15
      $pdu->{sm_default_msg_id}, # 16
-     #undef,                     # 17  sm_length
-     $pdu->{short_message}      # 18
+     $sm_length,                # 17
 #                  1
 #                8901234567 8
-     ) = unpack 'CCCCC/a*', substr($pdu->{data}, $len);
+     ) = unpack 'CCCCC', substr($pdu->{data}, $len);
+    $len += 1 + 1 + 1 + 1 + 1;
+    ($pdu->{short_message}      # 18
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
     
-    return $len + 1 + 1 + 1 + 1 + 1
-	+ length($pdu->{short_message});
+    return $len + $sm_length;
 }
 
 sub encode_submit_multi {
@@ -1332,11 +1359,11 @@ sub encode_submit_multi {
     return pack('Z*CCZ*C',
 		$service_type, $source_addr_ton, $source_addr_npi, $source_addr,
 		scalar(@destination_addr)) . $addr_data
-		    . pack('CCCZ*Z*CCCCC/a*',
+		    . pack('CCCZ*Z*CCCCCa*',
 			   $esm_class, $protocol_id, $priority_flag,
 			   $schedule_delivery_time, $validity_period,
 			   $registered_delivery, $replace_if_present_flag, $data_coding,
-			   $sm_default_msg_id, $short_message, );
+			   $sm_default_msg_id, length($short_message), $short_message, );
 }
 
 sub submit_multi { $_[0]->req_backend(CMD_submit_multi, &encode_submit_multi, @_) } # public API
@@ -1437,6 +1464,7 @@ sub encode_submit_sm_resp_v4 {
 	next if !defined $_[$i];
 	#warn "$i:>>>$_[$i]<<<";
 	if ($_[$i] eq 'message_id') { $message_id = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'sc_msg_reference') { $message_id = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'dest_addr_ton')   {
 	    @dest_addr_ton = ref($_[$i+1]) ? @{scalar(splice @_,$i,2,undef,undef)}
 	                                   : (scalar(splice @_,$i,2,undef,undef));
@@ -1531,7 +1559,7 @@ sub encode_query_sm_v4 {
 	elsif ($_[$i] eq 'source_addr') { $source_addr = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'dest_addr_ton')  { $dest_addr_ton = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'dest_addr_npi')  { $dest_addr_npi = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'destiantion_addr') { $destination_addr = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'destination_addr') { $destination_addr = splice @_,$i,2,undef,undef; }
     }
 
     ### Apply defaults for those mandatory arguments that were not specified
@@ -1555,8 +1583,8 @@ sub encode_query_sm_v4 {
 sub query_sm {
     my $me = $_[0];
     return $me->req_backend(CMD_query_sm, ${*$me}{smpp_version} == 0x40  #4
-	? &encode_query_v4 : &encode_query_v34, @_);                     #4
-    return $me->req_backend(CMD_query_sm, &encode_query_v34, @_);
+	? &encode_query_sm_v4 : &encode_query_sm_v34, @_);               #4
+    return $me->req_backend(CMD_query_sm, &encode_query_sm_v34, @_);
 }
 
 sub decode_query_resp_v34 {
@@ -1589,16 +1617,17 @@ sub decode_query_resp_v4 {
 }
 #4#end
 
-sub encode_query_resp_v34 {
+sub encode_query_sm_resp_v34 {
     my $me = $_[0];
     my ($message_id, $final_date, $message_state, $error_code);
+    $message_id = '2';
 
-    for (my $i=1; $i <= $#_; $i+=2) {
+    for (my $i=1; $i < $#_; $i+=2) {
 	next if !defined $_[$i];
-	if ($_[$i] eq 'message_id') { $message_id = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'final_date') { $final_date = splice @_,$i,2,undef,undef; }
+	if ($_[$i] eq 'message_id')       { $message_id    = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'final_date')    { $final_date    = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'message_state') { $message_state = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'error_code')    { $error_code = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'error_code')    { $error_code    = splice @_,$i,2,undef,undef; }
     }
     
     croak "message_id must be supplied" if !defined $message_id;
@@ -1609,19 +1638,19 @@ sub encode_query_resp_v34 {
 }
 
 #4#cut
-sub encode_query_resp_v4 {
+sub encode_query_sm_resp_v4 {
     my $me = $_[0];
     my ($sc_msg_reference, $final_date, $message_status, $network_error_code);
-
+    
     for (my $i=1; $i <= $#_; $i+=2) {
 	next if !defined $_[$i];
-	if ($_[$i] eq 'sc_msg_reference') { $sc_msg_reference = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'message_id') { $sc_msg_reference = splice @_,$i,2,undef,undef; } # v34
-	elsif ($_[$i] eq 'final_date') { $final_date = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'message_status') { $message_status = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'message_state') { $message_status = splice @_,$i,2,undef,undef; } # v34
+	if ($_[$i] eq 'sc_msg_reference')     { $sc_msg_reference = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'message_id')        { $sc_msg_reference = splice @_,$i,2,undef,undef; } # v34
+	elsif ($_[$i] eq 'final_date')        { $final_date = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'message_status')    { $message_status = splice @_,$i,2,undef,undef; }
+	elsif ($_[$i] eq 'message_state')     { $message_status = splice @_,$i,2,undef,undef; } # v34
 	elsif ($_[$i] eq 'networkerror_code') { $network_error_code = splice @_,$i,2,undef,undef; }
-	elsif ($_[$i] eq 'error_code') { $network_error_code = splice @_,$i,2,undef,undef; } # v34
+	elsif ($_[$i] eq 'error_code')        { $network_error_code = splice @_,$i,2,undef,undef; } # v34
     }
     
     croak "sc_msg_reference or message_id must be supplied" if !defined $sc_msg_reference;
@@ -1634,9 +1663,9 @@ sub encode_query_resp_v4 {
 
 sub query_sm_resp {
     my $me = $_[0];
-    $me->resp_backend(CMD_query_sm_resp, ${*$me}{smpp_version} == 0x40    #4
-	? &encode_query_resp_v4 : &encode_query_resp_v34, @_);            #4
-    $me->resp_backend(CMD_query_sm_resp, &encode_query_resp_v34, @_);
+    return $me->resp_backend(CMD_query_sm_resp, ${*$me}{smpp_version} == 0x40    #4
+    ? &encode_query_sm_resp_v4 : &encode_query_sm_resp_v34, @_);      #4
+    return $me->resp_backend(CMD_query_sm_resp, &encode_query_sm_resp_v34, @_);
 }
 
 ### alert_notification (4.12.1), p.108
@@ -1700,14 +1729,17 @@ sub decode_replace_sm_v34 {
     ($pdu->{validity_period}) = unpack 'Z*', substr($pdu->{data}, $len);
     $len += length($pdu->{validity_period}) + 1;
 
+    my $sm_length;
     ($pdu->{registered_delivery}, # 7
      $pdu->{sm_default_msg_id}, # 8
-     #undef,                     # 9  sm_length
-     $pdu->{short_message}      # 10
+     $sm_length,                # 9
 #                123456789 0
-     ) = unpack 'CCC/a*', substr($pdu->{data}, $len);
+     ) = unpack 'CCC', substr($pdu->{data}, $len);
+    $len += 1 + 1 + 1;
+    ($pdu->{short_message}      # 10
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
     
-    return $len + 1 + 1 + 1 + length($pdu->{short_message});
+    return $len + $sm_length;
 }
 
 #4#cut
@@ -1721,18 +1753,21 @@ sub decode_replace_sm_v4 {
      ) = unpack 'Z*', substr($pdu->{data}, $len);
     $len += length($pdu->{schedule_delivery_time}) + 1;
 
+    my $sm_length;
     ($pdu->{validity_period},   # 6    n
      $pdu->{registered_delivery_mode}, # C
      $pdu->{data_coding},       # 8  C
      $pdu->{sm_default_msg_id}, # 8  C
-     #undef,                     # 9  n sm_length
-     $pdu->{short_message}      # 10 a
-     ) = unpack 'nCCCn/a*', substr($pdu->{data}, $len);
+     $sm_length,                # 9  n
+     ) = unpack 'nCCCn', substr($pdu->{data}, $len);
+    $len += 2 + 1 + 1 + 1 + 2;
+    ($pdu->{short_message}      # 10 a
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
     
     $pdu->{message_id} = $pdu->{msg_reference}; # v34 compat
     $pdu->{registered_delivery} = $pdu->{registered_delivery_mode}; # v34 compat
     
-    return $len + 2 + 1 + 1 + 1 + 2 + length($pdu->{short_message});
+    return $len + $sm_length;
 }
 #4#end
 
@@ -1769,10 +1804,10 @@ sub encode_replace_sm_v34 {
     $sm_default_msg_id = ${*$me}{sm_default_msg_id} if !defined $sm_default_msg_id;
     $short_message = ${*$me}{short_message} if !defined $short_message;
 
-    return pack('Z*CCZ*Z*Z*CCC/a*',
+    return pack('Z*CCZ*Z*Z*CCCa*',
 		$message_id, $source_addr_ton, $source_addr_npi, $source_addr,
 		$schedule_delivery_time, $validity_period,
-		$registered_delivery, $sm_default_msg_id, $short_message, );
+		$registered_delivery, $sm_default_msg_id, length($short_message), $short_message, );
 }
 
 #4#cut
@@ -1820,20 +1855,20 @@ sub encode_replace_sm_v4 {
     $sm_default_msg_id = ${*$me}{sm_default_msg_id} if !defined $sm_default_msg_id;
     $short_message = ${*$me}{short_message} if !defined $short_message;
 
-    return pack('Z*CCZ*CCZ*Z*nCCCn/a*',
+    return pack('Z*CCZ*CCZ*Z*nCCCna*',
 		$msg_reference, $source_addr_ton, $source_addr_npi, $source_addr,
 		$dest_addr_ton, $dest_addr_npi, $destination_addr,
 		$schedule_delivery_time, $validity_period,
-		$registered_delivery_mode, $data_coding, $sm_default_msg_id, $short_message, );
+		$registered_delivery_mode, $data_coding, $sm_default_msg_id, length($short_message), $short_message, );
 }
 #4#end
 
 sub replace_sm {
     my $me = $_[0];
-    $me->req_backend(CMD_replace_sm, ${*$me}{smpp_version} == 0x40                 #4
+    return $me->req_backend(CMD_replace_sm, ${*$me}{smpp_version} == 0x40                 #4
 				? &encode_replace_sm_v4 : &encode_replace_sm_v34,  #4
 				@_);                                               #4
-    $me->req_backend(CMD_replace_sm, &encode_replace_sm_v34, @_);
+    return $me->req_backend(CMD_replace_sm, &encode_replace_sm_v34, @_);
 }
 
 ### cancel (4.9.1), p.98
@@ -1984,15 +2019,17 @@ sub decode_delivery_receipt {
     ($pdu->{done_date}) = unpack 'Z*', substr($pdu->{data}, $len);
     $len += length($pdu->{done_date}) + 1;
     
+    my $sm_length;
     ($pdu->{message_state},      # 13 N
      $pdu->{network_error_code}, # 14 N
      $pdu->{data_coding},        # 15 C
-     #      sm_length                 n
-     $pdu->{short_message},      # 17 a    
+     $sm_length,                 # 16 n
 #                234567890123456 7
-     ) = unpack 'NNCn/a*', substr($pdu->{data}, $len);
-    $len += 4 + 4 + 1 + 2 + length($pdu->{short_message});
-    return $len;
+     ) = unpack 'NNCn', substr($pdu->{data}, $len);
+    $len += 4 + 4 + 1 + 2;
+    ($pdu->{short_message},      # 17 a    
+     ) = unpack "a$sm_length", substr($pdu->{data}, $len);
+    return $len + $sm_length;
 }
 
 sub encode_delivery_receipt {
@@ -2044,12 +2081,12 @@ sub encode_delivery_receipt {
     $data_coding = ${*$me}{data_coding} if !defined $data_coding;
     $short_message = ${*$me}{short_message} if !defined $short_message;
 
-    return pack('CCZ*CCZ*Z*NNZ*Z*NNCn/a*',
+    return pack('CCZ*CCZ*Z*NNZ*Z*NNCna*',
 		$source_addr_ton, $source_addr_npi, $source_addr,
 		$dest_addr_ton, $dest_addr_npi, $destination_addr,
 		$msg_reference, $num_msgs_submitted, $num_msgs_delivered,
 		$submit_date, $done_date, $message_state,
-		$network_error_code, $data_coding, $short_message);
+		$network_error_code, $data_coding, length($short_message), $short_message);
 }
 
 sub delivery_receipt { $_[0]->req_backend(CMD_delivery_receipt, &encode_delivery_receipt, @_) }
@@ -3094,6 +3131,10 @@ Typical server, run from inetd:
 
   ***
 
+See test.pl for good templates with all official parameters, but
+beware that the actual parameter values are ficticious as is the flow
+of the dialog.
+
 #4#cut
 =head1 VERSION 4.0 SUPPORT
 
@@ -3207,7 +3248,7 @@ To create version 4 connection, you must specify smpp_version => 0x40
 and you should not bind as transciever as that is not supported by the
 specification.
 
-As v3.4 specifications seem more mature I recommend that where attributes
+As v3.4 specifications seem more mature, I recommend that where attributes
 have been renamed between v4 and v3.4 you stick to using v3.4 names. I
 have tried to provide compatibility code where ever possible.
 
@@ -3256,6 +3297,8 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 =head1 SEE ALSO
 
 =over 4
+
+=item test.pl from this package
 
 =item www.smpp.org
 

@@ -13,6 +13,12 @@ Revision history for Perl extension Net::SMPP.
 	fixed encode_deliver_v4 to encode_deliver_sm_v4, bug reported
         by Cristina Del Amo (Cristina.delAmo@vodafone-us.com)
 
+0.95  10.1.2002
+       applied big patch by Lars Thegler <lars@@thegler_.dk> to
+       make pack and unpack templates perl5.005_03 compatible.
+       Caught bugs in decode_outbind_v34(), encode_query_sm(),
+       encode_query_sm_resp() and replace_sm() --Sampo
+
 Note: exact change logs are kept in CVS
 
 Interested readers:
@@ -23,5 +29,6 @@ Roland Giersig <r.giersig@xsoft.at>
 "Andres Maduro" <andres@iconos.com.ve>
 Richard Morgan <Richard@webcom.com.au>
 "Artem Zotov" <zot_aa@inform-mobil.ru>
+lars@thegler.dk
 
-paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru
+paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk
