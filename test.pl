@@ -1,6 +1,6 @@
 # Test script for Net::SMPP
 # 8.1.2002, Sampo Kellomaki <sampo@symlabs.com>
-# $Id: test.pl,v 1.2 2002/01/11 04:51:16 sampo Exp $
+# $Id: test.pl,v 1.3 2002/05/27 04:14:43 sampo Exp $
 #
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl test.pl'

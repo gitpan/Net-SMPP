@@ -23,6 +23,7 @@ Revision history for Perl extension Net::SMPP.
       applied enquiry to enquire fix from Ismael Briones <ismael@el-mundo.net>
 1.01  3.4.2002
       Added more error reporting from Cris
-
-Note: exact change logs are kept in CVS
-
+1.02  7.12.2002
+      Applied some patched by Luis Munoz <lem@@cantv.net> --Sampo
+1.03  8.12.2002
+      Another iteration pf patches from Luis Munoz --Sampo

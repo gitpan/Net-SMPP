@@ -21,8 +21,10 @@
 #            encode_query_sm_resp() and replace_sm() --Sampo
 # 11.1.2002, 7bit pack and unpack --Sampo
 # 3.4.2002,  command length check from Cris, rolled out 1.01 --Sampo
+# 7.12.2002, applied some patched by Luis Munoz <lem@@cantv.net> --Sampo
+# 8.12.2002, more patched from Luis, --Sampo
 #
-# $Id: SMPP.pm,v 1.21 2002/04/03 17:29:33 sampo Exp $
+# $Id: SMPP.pm,v 1.25 2002/12/08 19:04:36 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -44,7 +46,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.01';
+$VERSION = '1.03';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -125,6 +127,17 @@ use constant status_code => {
 ###     vendor specific range, please let me know so we can teach
 ###     this module about them.
 
+};
+
+### Convert the status code table into constants
+
+do {
+    no strict "refs";
+    for my $k (keys(%{&status_code}))
+    {
+	eval { *{status_code->{$k}->{code}}        = sub { return $k; } };
+        eval { *{status_code->{$k}->{code}.'_msg'} = sub { return $k; } };
+    }
 };
 
 ### Command IDs, sec 5.1.2.1, table 5-1, pp. 110-111
@@ -2173,9 +2186,9 @@ sub new_transceiver {
 sub new_transmitter {
     my $type = shift;
     my $me = $type->new_connect(@_);
-    warn "Connected, sending bind: ".Dumper($me);
+    warn "Connected, sending bind: ".Dumper($me) if $trace;
     my $resp = $me->bind_transmitter();
-    warn "Bound".Dumper($resp);
+    warn "Bound: ".Dumper($resp) if $trace;
     return ($me, $resp) if wantarray;
     return $me;
 }
@@ -2298,6 +2311,18 @@ sub explain_status {
 		   Net::SMPP::status_code->{${*$me}{status}}->{msg},
 		   Net::SMPP::status_code->{${*$me}{status}}->{code},
 		   ${*$me}{status});
+}
+
+sub cmd {
+    my $me = shift;
+    return ${*$me}{cmd};
+}
+
+sub explain_cmd {
+    my $me = shift;
+    my $cmd = Net::SMPP::pdu_tab->{${*$me}{cmd}}
+    || { cmd => sprintf(q{Unknown(0x%08X)}, ${*$me}{cmd}) };
+    return $cmd->{cmd};
 }
 
 package Net::SMPP;
@@ -2787,7 +2812,7 @@ For example
       or die;
    die "Response indicated error: " . $resp_pdu->explain_status()
        if $resp_pdu->status;
-   $msg_id = $resp_pdu->message_id;
+   $msg_id = $resp_pdu->{message_id};
 
    $resp_pdu = $smpp->query_sm(message_id => $msg_id) or die;
    die "Response indicated error: " . $resp_pdu->explain_status()
@@ -3171,7 +3196,7 @@ set in tandem.
 
 Typical client:
 
-  use Net:SMPP;
+  use Net::SMPP;
   $smpp = Net::SMPP->new_transciever('smsc.foo.net', Port=>2552) or die;
   $resp_pdu = $smpp->submit_sm(desination_addr => '447799658372',
 			       data => 'test message') or die;
@@ -3303,6 +3328,35 @@ have been renamed between v4 and v3.4 you stick to using v3.4 names. I
 have tried to provide compatibility code where ever possible.
 
 #4#end
+
+=head1 MISC. NOTES
+
+Unless you wrote your program to be multithreaded or
+multiprocess, everything will happen in one thread of execution.
+Thus if you get unbind while doing somehting else (e.g. checking
+your directory), it stays in operating system level buffers until
+you actually call read_pdu(). Thus knowing it or not is of little
+use. You can write your program to assume the network traffic arrives
+only exactly when you call read_pdu().
+
+Regarding the unbind, it is normally handled by a dispatch table
+automatically if you use wait_pdu() to receive your traffic. But
+if you created your own dispatch table, you will have to add it
+there yourself. If you are calling read_pdu() then you have
+to handle it yourslef. Even if you are using the
+supplied table, you may want to double check - there could be a bug.
+
+One more thing: if your problem is knowing whether wait_pdu() or
+read_pdu() would block, then you have two possible solutions:
+
+	1. use select(2) systemcall to determine for the socket
+	   is ready for reading
+	2. structure your program as several processes (e.g. one
+	   for sending and one for receiving) so that you
+	   can afford to block
+
+The above two tricks are not specific to my module. Consult any standard
+text book on TCP/IP network programming.
 
 =head1 ERRORS
 
