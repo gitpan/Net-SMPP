@@ -1,0 +1,36 @@
+README for Net::SMPP Perl module
+================================
+12.3.2001, Sampo Kellomaki <sampo@iki.fi>
+
+This readme describes version 0.01 of the module, implementing SMPP 3.4.
+
+Net::SMPP is an implementation of Short Message Peer to Peer protocol
+over TCP. This protocol is frequently used in the telecoms and mobile
+operator world to pass short messages between systems that implement
+the short message service (SMS). It is applicable to both european GSM
+and american CDMA based systems. The SMPP protocol is documented at
+
+	www.smpp.org
+
+This module aims at fully implementing version 3.4 of the
+protocol. During the 0.xx version series the implementation will still
+be incomplete or may contain parts that are implemented but never
+tested. Read comments in the source to see if testing has been
+done. If you test a previusly untested PDU (protocol data unit),
+please report success, failure, or difficulties to the author.
+
+Building
+--------
+
+	perl Makefile.PL
+	make
+	make test
+	make install	# su to root prior to this, if needed
+
+Approach
+--------
+
+Testing
+-------
+
+--Sampo

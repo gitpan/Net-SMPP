@@ -1,0 +1,143 @@
+From: 
+       "Felix Gaehtgens" <felix@symlabs.com>
+   To: 
+       sampo@symlabs.com
+  Date: 
+       13 Mar 2001, 03:20:23 PM 
+Subject: 
+       Problema con PACA? (fwd) 
+
+
+
+
+
+
+----------Forwarded message ----------
+Delivered-To: felix@symlabs.com
+Return-Path: <asordom@airtel.es>
+Received: from m2-pasarela3.airtel.es ([212.73.32.197])
+  by mail.mercnet.pt with esmtp; Tue, 13 Mar 2001 13:39:22 +0000
+Message-ID: <OF96995CFF.1A0C49A3-ONC1256A0E.004AB83F@airtel.es>
+To: felix@sylabs.com
+Subject: Re: Problema con PACA?
+From: asordom@airtel.es
+Date: Tue, 13 Mar 2001 14:38:42 +0100
+X-MIMETrack: Serialize by Router on M2-SMTP3/AIRTEL(Release 5.0.5
+|September 22, 2000) at
+ 03/13/2001 02:39:24 PM
+MIME-Version: 1.0
+Content-type: multipart/mixed; 
+        Boundary="0__=C1256A0E004ADEB08f9e8a93df938690918cC1256A0E004ADEB0"
+Content-Disposition: inline
+
+
+
+---------------------- Remitido por asordom/AIRTEL con fecha 13/03/2001=
+
+14:36 ---------------------------
+
+
+Jes=FAs Mariano Pascual D=EDaz <jmpascual@sgi.es> con fecha 13/03/2001 =
+11:23:03
+Asunto:   Re: Problema con PACA?
+
+
+Hola Arturo:
+
+El funcionamiento de la PACA-SMSC es el siguiente:
+
+Conexi=F3n v=EDa SMPP sobre TCP/IP:
+------------------------------------
+
+Si el cliente implementa la versi=F3n 3.3 (o anterior) de SMPP
+entonces tendr=E1 que establecer dos conexiones diferentes
+(con el mismo puerto, no hace falta usar puertos distintos)
+(una para enviar SMs -Bind transmitter- y otra para recibir
+los mensajes MO -Bind receiver-). La PACA-SMSC no
+implementa un almacenamiento permanente de los mensajes
+MO, si el SMSC le entrega un mensaje nuevo dirigido a una
+aplicaci=F3n (ESME) y esta aplicaci=F3n no se encuentra conectada
+(para recibir) entonces el mensaje ser=E1 descartado.
+
+Si el cliente implementa la versi=F3n 3.4 entonces podr=E1 establecer
+una =FAnica conexi=F3n con la PACA-SMSC (Bind transceiver)
+y por ella podr=E1 enviar los SMs hacia los m=F3viles y recibir los
+mensajes originados por estos =FAltimos.
+
+En cualquier caso, cualquier cliente podr=E1 enviar mensajes de
+texto, binarios, etc.
+
+Hay varios esquemas de codificaci=F3n soportados por la PACA-SMSC:
+los valores posibles del campo data_coding son 0 y [240-247].
+Su significado viene dado por la propia especificaci=F3n GSM.
+Cualquier valor diferente de estos provocar=E1 un error en el env=EDo.
+
+
+Conexi=F3n v=EDa OIS (SMS2000) sobre TCP/IP:
+-----------------------------------------------
+
+En este caso no ser=E1 necesario m=E1s que un =FAnico canal tanto
+para los env=EDos como para la recepci=F3n de mensajes MO.
+Los esquemas de codificaci=F3n permitidos comprenden los
+mismos valores que en el caso anterior.
+
+
+No s=E9 si necesitas alg=FAn dato m=E1s, en cualquier caso,
+si tienes alguna duda ponte en contacto con cualquiera de
+nosotros.
+
+
+Cordialmente,
+
+    J. Mariano Pascual
+    SGI Soluciones Globales Internet
+
+
+=
+
+
+
+From: 
+       "Felix Gaehtgens" <felix@symlabs.com>
+    To: 
+       "Felix Gaehtgens" <felix@symlabs.com>, arturoto@lettera.net
+    Cc: 
+       asordom@airtel.es, sampo@symlabs.com, kevin.greene@vodafone-us.com
+  Date: 
+       12 Mar 2001, 04:16:01 PM 
+Subject: 
+       Re: Problema con PACA? 
+
+
+
+Felix Gaehtgens writes:
+
+> 
+> Hola Arturo,
+> 
+> tenemos todavia un problema con la receipcion de mensajes.
+> 
+> Primero, dejame escribir mi entendimiento de la recepcion de mensajes SMS:
+> 
+> 1. PACA (172.16.3.163) conecta a nuestra maquina, puerto 163.
+> 
+> 2. PACA autentica (utilizando SMPP bind), systemid: Colon password:
+> Descubri
+> 
+> 3. PACA nos envia mensajes utilizando SMPP send
+> 
+> Asi podriamos decir que hacemos un nuestra maquina una "emulacion" de un
+> SMSC basico, que permite conectar a traves de TCP/SMPP y recibe mensajes.
+> Nuestro demonio entonces escucha en puerto tcp:2552 a conexiones
+> exteriores.
+> 
+> La verdad es que todavia no tenemos nuestro demonio listo que habla SMPP en
+> modo de recepcion, pero ya hemos arrancado un programa que escucha en
+> puerto 2552 y nos escribe un hex dump de todo que entra por este puerto.
+> Hasta ahora, no habia NINGUNA conexion. Puedes hechar un vistazo?
+> 
+> Muchisimas gracias,
+> 
+> - Felix
+
+
