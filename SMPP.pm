@@ -14,8 +14,9 @@
 #            extracted for public distribution --Sampo                    #4
 # 11.12.2001, fixed encode_deliver_v4 to encode_deliver_sm_v4, bug reported
 #            by Cristina Del Amo (Cristina.delAmo@vodafone-us.com), --Sampo
+# 4.1.2002,  Fixed enquiry_link to enquire_link --Sampo
 #
-# $Id: SMPP.pm,v 1.16 2001/12/11 18:23:03 sampo Exp $
+# $Id: SMPP.pm,v 1.18 2002/01/06 01:56:21 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -39,7 +40,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '0.93';
+$VERSION = '0.94';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -2205,7 +2206,7 @@ use constant pdu_tab => {
     0x80000021 => { cmd => 'submit_multi_resp', decode => \&decode_submit_multi_resp, }, # i
     0x00000102 => { cmd => 'alert_notification', decode => \&decode_alert_notification, }, # i
     0x00000103 => { cmd => 'data_sm', decode => \&decode_data_sm, },          # i
-    0x80000103 => { cmd => 'data_sm_resp', decode => \&decode_submit_resp, }, # i
+    0x80000103 => { cmd => 'data_sm_resp', decode => \&decode_submit_resp_v34, }, # i
 
 #4#cut
     # v4 codes
@@ -2273,10 +2274,14 @@ sub read_hard {
 	$n = $me->read($$dr, $len-$n, $n+$offset);
 	if (!defined($n)) {
 	    warn "error reading header from socket: $!";
+	    $me->{smpperror} = "read_hard I/O error: $!";
+	    $me->{smpperrorcode} = 1;
 	    return undef;
 	}
 	if (!$n) {
 	    warn "premature eof reading from socket";
+	    $me->{smpperror} = "read_hard premature eof";
+	    $me->{smpperrorcode} = 2;
 	    return undef;
 	}
     }
@@ -2300,6 +2305,8 @@ sub read_pdu {
      $pdu->{reserved}) = unpack ${*$me}{head_templ}, $header;
     if ($len < $head_len) {
 	warn "Too short length $len < ${*$me}{head_len}, cmd=$pdu->{cmd}, status=$pdu->{status}, seq=$pdu->{seq}";
+        $me->{smpperror} = "read_pdu: Too short length $len < ${*$me}{head_len}, cmd=$pdu->{cmd}, status=$pdu->{status}, seq=$pdu->{seq}";
+        $me->{smpperrorcode} = 3;
 	return undef;
     }
     warn "read Header:\n".hexdump($header, "\t") if $trace;
@@ -2337,11 +2344,11 @@ sub wait_pdu {
     }
 }
 
-### Send a response to enquiry_link
+### Send a response to enquire_link
 
-sub handle_enquiry_link {
+sub handle_enquire_link {
     my ($me, $pdu) = @_;
-    $me->enquiry_link_resp(seq => $pdu->{seq});
+    $me->enquire_link_resp(seq => $pdu->{seq});
 }
 
 1;
@@ -2354,7 +2361,7 @@ Net::SMPP - pure Perl implementation of SMPP 3.4 over TCP
 =head1 SYNOPSIS
 
   use Net::SMPP;
-  $smpp = Net::SMPP->new_client($host, port=>$port,
+  $smpp = Net::SMPP->new_transciever($host, port=>$port,
 			system_id => 'yourusername',
 			password  => 'secret',
 			) or die;
@@ -2366,42 +2373,104 @@ pass short messages between mobile operators implementing short message
 service (SMS). This is applicable to both european GSM and american CDMA/TDMA
 systems.
 
-Despite its name, SMPP protocol defines a client (ESME) and a server (often
-called SMSC in the mobile operator world). Client usually initiates the
-TCP connection and does I<bind> to log in. After binding, a series of
-request response pairs, called PDUs (protocol data units) is
-exchanged. Request can be initiated by either end (hence
-"peer-to-peer"?) and the other end reponds. Requests are numbered
-with a sequence number and each response has corresponding sequence
-number. This allows several requests to be pending at the same
-time. Conceptually this is similar to IMAP or LDAP.
+This documentation is not intended to be complete reference to SMPP
+protocol - use the SMPP specification documents (see references
+section) to obtain exact operation and parameter names and their
+meaning. You may also need to obtain site specific documentation about
+the remote end and any protocol extensions that it supports or demands
+before you start a project. This document follows the convention of
+spelling parameter names exactly as they appear in the SMPP v3.4
+documentation. SMPP v4.0 support also follows the respective
+documentation, except where v4.0 usage is in conflict with v3.4 usage,
+in which case the latter prevails (in practise I believe no such
+conflicts remain in the madule at present). For a complete list of error
+code and optional parameter enumerations, the reader is encouraged to
+consult the source code or SMPP speciofications.
+
+Despite its name, SMPP protocol defines a client (ESME) and a server
+(often called SMSC in the mobile operator world). Client usually
+initiates the TCP connection and does I<bind> to log in. After
+binding, a series of request response pairs, called PDUs (protocol
+data units) is exchanged. Request can be initiated by either end
+(hence "peer-to-peer"?) and the other end reponds. Requests are
+numbered with a sequence number and each response has corresponding
+sequence number. This allows several requests to be pending at the
+same time. Conceptually this is similar to IMAP or LDAP message IDs.
+Usually the $smpp object maintains the sequence numbers by itself and
+the programmer need not concern himself with their exact values, but
+should a need to override them arise, the seq argument can be supplied
+to any request or response method.
 
 Normally this module operates in synchronous mode, meaning that a
-method that sends a request will also block until it gets a
-response. Internal command used for waiting for response is
+method that sends a request will also block until it gets the
+corresponding response. Internal command used for waiting for response is
 
     $resp_pdu = $smpp->wait_pdu($cmd_id, $seq);
 
 If, while waiting for a particular response, other PDUs are received
 they are either handled by handlers (set up by constructor) or
-discarded. If caller wants to receive a command, he can call
+discarded. Both command code and sequence number must match. Typically
+a handler for enquire command is set up while all other commands are
+silently dropped. This practise may not be very suitable for
+transciever mode of operation and certainly is not suitable for
+implementing a SMSC.
 
-    $pdu = $smpp->read_pdu();
+Synchronous operation makes it impossible to interleave SMPP
+operations, thus it should be regarded as a simplified programming
+model for simple tasks. Anyone requiring more advanced control has to
+use the asynchronous mode and take up the burden of understanding and
+implementing more of the message flow logic in his own application.
 
-which will block until a command is received from the stream.
+In synchronous mode request PDU methods return a Net::SMPP::PDU object
+representing the response, if all went well protocolwise, or undef if
+there was a protocol level error. If undef was returned, the reason
+for the failure can be extracted from $smpp->{smpperror} and
+$smpp->{smpperrorcode} (actual codes are undocumented at the moment,
+but are guaranteed not to change) variables and the global variable
+$!. These variables are meaningless if anything else than undef was
+returned. The response itself may be an error response if there was an
+application level error in the remote end. In this case the application
+level error can be determined from $pdu->{status} field. Some
+responses also have optional parameters that further clarify the failure,
+see documentation for each operation.
 
-Module can also be used asynchronously by specifying async=>1
-to the constructor. In this mode command methods return immediately
-and user should poll for any responses using
+If a protocol level error happens, probably the only safe action is
+to destroy the connection object (e.g. undef $smpp). If an application
+level error happens, then depending on how the remote end has been
+implemented it may be possible to continue operation.
+
+Module can also be used asynchronously by specifying async=>1 to the
+constructor. In this mode command methods return immediately with the
+sequence number of the PDU and user should poll for any responses
+using
 
     $pdu = $smpp->wait_pdu($cmd_id, $seq);
 
-If wait_pdu returns a command, the caller should generate appropriate
+Typically wait_pdu() is used to wait for a response, but if wait_pdu()
+is used to wait for a command, the caller should generate appropriate
 response.
 
-If the caller does not want to block on wait_pdu(), he must use
-select() to determine if the socket is readable. (*** what if SSL
-layer gets inserted?)
+If caller wants to receive next available PDU, he can call
+
+    $pdu = $smpp->read_pdu();
+
+which will block until a PDU is received from the stream. The caller would
+then have to check if the PDU is a response or a request and take appropriate
+action. The smsc.pl example program supplied with this distribution
+demonstrates a possible framework for handling both requests and responses.
+
+If the caller does not want to block on wait_pdu() or read_pdu(), he
+must use select() to determine if the socket is readable (*** what if
+SSL layer gets inserted?). Even if the socket selects for reading,
+there may not be enough data to complete the PDU, so the call may
+still block. Currently there is no reliable mechanism for avoiding
+this. If this bothers you, you may consider allocating a separate
+process for each connection so that blocking does not matter, or you
+may set up some sort of timeout (see perlipc(1) man page) or you may
+rewrite this module and contribute patches.
+
+Response methods always return the sequence number, irrespective
+of synchronous or asynchronous mode, or undef if an error happened.
 
 =head1 CONSTRUCTORS
 
@@ -2412,11 +2481,11 @@ layer gets inserted?)
 Do not call. Has special internal meaning during accepting connections
 from listening socket.
 
-=item new_client()
+=item new_connect()
 
 Create a new SMPP client object and open conncetion to SMSC host
 
-    $smpp = new Net::SMPP
+    $smpp = Net::SMPP->new_connect($host,
        system_id => 'username',   # usually needed (default '')
        password => 'secret',      # usually needed (default '')
        system_type => '',         # default ok, often not needed
@@ -2424,7 +2493,10 @@ Create a new SMPP client object and open conncetion to SMSC host
        addr_ton => 0x00,          # default ok, type of number unknwn
        addr_npi => 0x00,          # default ok, number plan indicator
        address_range => '',       # default ok, regex matching nmbrs
-        or die;
+       ) or die;
+
+Usually this constructor is not called directly. Use
+new_transciever(), new_transmitter(), and new_receiver() instead.
 
 =item new_transceiver()
 
@@ -2432,17 +2504,15 @@ Create a new SMPP client object and open conncetion to SMSC host
 
 =item new_receiver()
 
-These constructors first construct the object and then bind using given
-type of bind request. See bind family of methods, below.
+These constructors first construct the object using new_connect() and
+then bind using given type of bind request. See bind family of
+methods, below. These constructors are usually used to implement
+ESME type functionality.
 
 =item new_listen('localhost', port=>2251)
 
 Create new SMPP server object and open socket to listen on
-given port.
-
-=item new_raw() ***
-
-Create new SMPP object without creating any socket or cruft.
+given port. This constructor is usually used to implement a SMSC.
 
 =back
 
@@ -2480,7 +2550,7 @@ to increment internally stored sequence number by one and use that.
 Most PDUs have mandatory parameters and optional parameters. If
 mandatory parameter is not supplied, it is inherited from the smpp
 object. This means that the parameter can either be set as an argument
-to the constructor or it is inherited from built in defaults in the
+to the constructor or it is inherited from built-in defaults in the
 innards of Net::SMPP (see C<Default> table from line 217
 onwards). Some mandatory parameters can not be defaulted - if they are
 missing a die results. In descriptions below, defaultable mandatory
@@ -2496,6 +2566,49 @@ included in the PDU. Optional parameters are not supported
 by previous versions of the SMPP protocol (up to and including 3.3).
 Applications wishing to be downwards compatible should not make
 use of optional parameters.
+
+Standard optional parameters can be supplied by their name (see
+C<param_tab> in the Net::SMPP source code, around line 345, for list of
+known optional parameters), but the programmer still needs to supply
+the value of the parameter in the expected format (one often has to
+use pack to construct the value). Consult SMPP specifications for
+the correct format.
+
+It is possible to supply arbitrary unsupported optional parameters
+by simply supplying the parameter tag as a decimal number. Consult
+your site dependent documentation to figure out the correct tags and
+to determine the correct format for the value.
+
+When optional parameters are returned in response PDUs, they are
+decoded and made available under both numeric tag and symbolic tag, if
+known. For example the delivery_failure_reson of data_sm_resp can be
+accessed both as $resp->{delivery_failure_reson} and $resp->{1061}.
+The application needs to interpret the formatting of optional
+parameters itself. The module always assumes they are strings, while
+often they actually are interpretted as integers. Consult SMPP
+specifications and site dependent documentation for correct format and
+use unpack to obtain the numbers.
+
+If an unknown nonnumeric parameter tags are supplied a warning is
+issued and parameter is skipped.
+
+In general the Net::SMPP module does not enforce SMPP
+specifications. This means that it will happily accept too long or too
+short values for manatory or optional parameters. Also the internal
+formatting of the parameter values is not checked in any way. The
+programmer should consult the SMPP specifications to learn the correct
+length and format of each mandatory and optional parameter.
+
+Similarily, if the remote end returns incorrect PDUs and Net::SMPP is
+able to parse them (usually because length fields match), then Net::SMPP
+will not perform any further checks. This means that some fields
+may be longer than allowed for in the specifications.
+
+I opted to leave the checks out at this stage because I needed a flexible
+module that allowed me to explore even nonconformant SMSC implementations.
+If the lack of sanity checks bothers you, formulate such checks and
+submit me a patch. Ideally one could at construction time supply an
+argument like "strict=>1" to enable the sanity checks.
 
 =over 4
 
@@ -2952,7 +3065,7 @@ Reads PDUs from stream and handles or discards them until matching PDU
 is found. Blocks until success. Typically wait_pdu() is used
 internally by request methods when operating in synchronous mode.  The
 PDUs to handle are specified by C<${*$me}{handlers}->{$command_id}>.
-The handlers table is initially populated to handle enquiry_link PDUs
+The handlers table is initially populated to handle enquire_link PDUs
 automatically, but this can be altered using C<handlers> argument to
 constructor.
 
