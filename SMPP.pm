@@ -12,8 +12,10 @@
 #            version to 0.90 to reflect successfully conducted tests --Sampo
 # 25.9.2001, tagged all 4.0 specifics so that 3.4-only version can be     #4
 #            extracted for public distribution --Sampo                    #4
+# 11.12.2001, fixed encode_deliver_v4 to encode_deliver_sm_v4, bug reported
+#            by Cristina Del Amo (Cristina.delAmo@vodafone-us.com), --Sampo
 #
-# $Id: SMPP.pm,v 1.15 2001/09/26 02:08:28 sampo Exp $
+# $Id: SMPP.pm,v 1.16 2001/12/11 18:23:03 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -37,7 +39,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '0.91';
+$VERSION = '0.93';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -1135,7 +1137,7 @@ sub deliver_sm {
     # N.B. deliver_sm v34 == submit_sm v34
     return $me->req_backend(CMD_deliver_sm,                             #4
 			    (${*$me}{smpp_version} == 0x40)             #4
-			    ? &encode_deliver_v4 : &encode_submit_v34,  #4
+			    ? &encode_deliver_sm_v4 : &encode_submit_v34,  #4
 			    @_);                                        #4
     return $me->req_backend(CMD_deliver_sm, &encode_submit_v34, @_);
 }
@@ -2160,6 +2162,7 @@ sub new_listen {
       LocalAddr => $host,
       LocalPort => exists $arg{port} ? $arg{port} : Default->{port},
       Proto    => 'tcp',
+      ReuseAddr => 'true',
       Listen   => exists $arg{listen} ? $arg{listen} : Default->{listen},
       Timeout  => exists $arg{timeout} ? $arg{timeout} : Default->{timeout})
 	or return undef;

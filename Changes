@@ -7,7 +7,21 @@ Revision history for Perl extension Net::SMPP.
 0.91  28.9.2001
 	- released to CPAN
 
+0.92	- internal release
+
+0.93  11.12.2001
+	fixed encode_deliver_v4 to encode_deliver_sm_v4, bug reported
+        by Cristina Del Amo (Cristina.delAmo@vodafone-us.com)
+
 Note: exact change logs are kept in CVS
 
 Interested readers:
 Paul Morris <paul.morris@totalise.co.uk>
+Chia-liang Kao <clkao@clkao.org>
+Roland Giersig <r.giersig@xsoft.at>
+"Tony Clark" <clarktony@hotmail.com>
+"Andres Maduro" <andres@iconos.com.ve>
+Richard Morgan <Richard@webcom.com.au>
+"Artem Zotov" <zot_aa@inform-mobil.ru>
+
+paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru
