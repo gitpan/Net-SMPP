@@ -4,7 +4,7 @@
 # See README for license. NO WARRANTY.
 #
 # 10.7.2001, Sampo Kellomaki <sampo@symlabs.com>
-# $Id: esme-rec.pl,v 1.3 2001/09/28 16:56:42 sampo Exp $
+# $Id: esme-rec.pl,v 1.4 2002/02/11 16:43:47 sampo Exp $
 #
 # ESME in receiver role.
 #
@@ -88,7 +88,7 @@ use constant reply_tab => {
 						       password => $pw) }, },
     0x00000015 => { cmd => 'enquire_link',
 		    reply => sub { my ($me, $pdu) = @_;
-				   $me->enquiry_link_resp(seq => $pdu->{seq}) }, },      
+				   $me->enquire_link_resp(seq => $pdu->{seq}) }, },      
     0x80000015 => { cmd => 'enquire_link_resp', reply => undef, }, 
     0x00000021 => { cmd => 'submit_multi',
 		    reply => sub { my ($me, $pdu) = @_;
@@ -161,7 +161,7 @@ use constant reply_tab => {
     0x80010009 => { cmd => 'delivery_receipt_resp_v4', reply => undef, },  
     0x0001000a => { cmd => 'enquire_link_v4',
 		    reply => sub { my ($me, $pdu) = @_;
-				   $me->enquiry_link_resp(seq => $pdu->{seq}) }, },
+				   $me->enquire_link_resp(seq => $pdu->{seq}) }, },
     0x8001000a => { cmd => 'enquire_link_resp_v4', reply => undef, },
     0x0001000b => { cmd => 'outbind_v4',
 		    reply => sub { my ($me, $pdu) = @_;

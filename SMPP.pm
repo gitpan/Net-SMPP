@@ -19,6 +19,7 @@
 #            make pack and unpack templates perl5.005_03 compatible. --Sampo
 #            Caught bugs in decode_outbind_v34(), encode_query_sm(),
 #            encode_query_sm_resp() and replace_sm() --Sampo
+# 11.1.2002, 7bit pack and unpack --Sampo
 #
 # $Id: SMPP.pm,v 1.19 2002/01/11 04:50:28 sampo Exp $
 
@@ -42,7 +43,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '0.95';
+$VERSION = '0.96';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -2388,6 +2389,50 @@ sub handle_enquire_link {
     $me->enquire_link_resp(seq => $pdu->{seq});
 }
 
+### GSM often uses 7bit encoding to squeeze 160 7bit characters
+### in 140 octets. This encoding is not automatically done by
+### this module, but following routines allow one to do it
+### manually.
+###
+### In general we can fit 8 7bit characters in 7 octets.
+###
+### Packing method:
+###
+### BIT:  76543210 76543210 76543210 76543210 76543210 76543210 76543210
+### BYTE: 0        1        2        3        4        5        6
+### CHAR: BAAAAAAA CCBBBBBB DDDCCCCC EEEEDDDD FFFFFEEE GGGGGGFF HHHHHHHG
+###
+### So as can be seen, the characters are encoded lowest bit to lowest
+### available bit position, just wrapping around. Another possiblity
+### would be as follows
+###
+### BIT:  76543210 76543210 76543210 76543210 76543210 76543210 76543210
+### BYTE: 0        1        2        3        4        5        6
+### CHAR: HAAAAAAA HBBBBBBB HCCCCCCC HDDDDDDD HEEEEEEE HFFFFFFF HGGGGGGG
+###
+### In this scheme the last character is distributed over the high bits
+### of the other bytes. while bytes A-G would just be normal.
+###
+### These routines still have some issues in handling the padding. Especially
+### unpack_7bit may leave some artifacts in the end.
+
+sub pack_7bit {
+    my ($s) = @_;
+    $s = unpack 'b*', $s;
+    $s =~ s/(.{7})./$1/g;    # Zap the high order (8th) bits
+    return pack 'b*', $s;
+}
+
+sub unpack_7bit {
+    my ($s) = @_;
+    $s = unpack 'b*', $s;
+    $s =~ s/(.{7})/${1}0/g;  # Stuff in high order (8th) bits
+    $s = pack 'b*', $s;
+    chop $s if substr($s, -1, 1) eq "\x00";
+    return $s;
+#    return pack 'b*', $s;
+}
+
 1;
 __END__
 
@@ -3311,6 +3356,12 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 =item www.wapforum.org
 
 =item Short Message Peer to Peer (SMPP) V4 Protocol Specification, 29-Apr-1997, Version 1.1 (from Aldiscon/Logica)  #4
+
+=item http://www.hsl.uk.com/documents/advserv-sms-smpp.pdf
+
+=item http://www.mobilesms.com/developers.asp
+
+=item http://opensmpp.logica.com
 
 =item perl(1)
 

@@ -2193,4 +2193,17 @@ if ($fail) {
     print "All tests successful.\n";
 }
 
+#exit;
+
+### Debugging section
+
+for $test (qw(abcdefgh abcdefg abcedf abcde abcd abc ab a abcdefghi abcdefghij abcdefghabcdefgh)) {
+    print "Testing >$test< len=".length($test)."\n";
+    $x = Net::SMPP::pack_7bit($test);
+    $y = Net::SMPP::unpack_7bit($x);
+    print "        >$y< len=".length($y)."\n";
+    print Net::SMPP::hexdump($x,"\t");
+    print Net::SMPP::hexdump($y,"\t");
+}
+
 #EOF

@@ -19,16 +19,8 @@ Revision history for Perl extension Net::SMPP.
        Caught bugs in decode_outbind_v34(), encode_query_sm(),
        encode_query_sm_resp() and replace_sm() --Sampo
 
+0.96  11.2.2002
+	applied enquiry to enquire fix from Ismael Briones <ismael@el-mundo.net>
+
 Note: exact change logs are kept in CVS
 
-Interested readers:
-Paul Morris <paul.morris@totalise.co.uk>
-Chia-liang Kao <clkao@clkao.org>
-Roland Giersig <r.giersig@xsoft.at>
-"Tony Clark" <clarktony@hotmail.com>
-"Andres Maduro" <andres@iconos.com.ve>
-Richard Morgan <Richard@webcom.com.au>
-"Artem Zotov" <zot_aa@inform-mobil.ru>
-lars@thegler.dk
-
-paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk
