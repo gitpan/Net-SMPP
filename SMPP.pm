@@ -20,8 +20,9 @@
 #            Caught bugs in decode_outbind_v34(), encode_query_sm(),
 #            encode_query_sm_resp() and replace_sm() --Sampo
 # 11.1.2002, 7bit pack and unpack --Sampo
+# 3.4.2002,  command length check from Cris, rolled out 1.01 --Sampo
 #
-# $Id: SMPP.pm,v 1.19 2002/01/11 04:50:28 sampo Exp $
+# $Id: SMPP.pm,v 1.21 2002/04/03 17:29:33 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -43,7 +44,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '0.96';
+$VERSION = '1.01';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -2350,7 +2351,11 @@ sub read_pdu {
     warn "read Header:\n".hexdump($header, "\t") if $trace;
     
     $len -= $head_len;
-    $me->read_hard($len, \$pdu->{data}, 0) or return undef;
+    $me->read_hard($len, \$pdu->{data}, 0) or do {
+        $me->{smpperror} = "read_pdu: invalid length cmd=$pdu->{cmd},status=$pdu->{status}, seq=$pdu->{seq}";
+        $me->{smpperrorcode} = 3;
+        return undef;
+    };
     warn "read Body:\n".hexdump($pdu->{data}, "\t") if $trace;
     
     ### Check if we know this PDU and decode it

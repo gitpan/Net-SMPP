@@ -20,7 +20,9 @@ Revision history for Perl extension Net::SMPP.
        encode_query_sm_resp() and replace_sm() --Sampo
 
 0.96  11.2.2002
-	applied enquiry to enquire fix from Ismael Briones <ismael@el-mundo.net>
+      applied enquiry to enquire fix from Ismael Briones <ismael@el-mundo.net>
+1.01  3.4.2002
+      Added more error reporting from Cris
 
 Note: exact change logs are kept in CVS
 
