@@ -1,6 +1,6 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
 # Copyright (c) 2001 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
-# Portions Copyright (c) 2001 Symlabs, All rights reserved.
+# Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
 # 12.3.2001, Sampo Kellomaki <sampo@symlabs.com>
@@ -23,8 +23,10 @@
 # 3.4.2002,  command length check from Cris, rolled out 1.01 --Sampo
 # 7.12.2002, applied some patched by Luis Munoz <lem@@cantv.net> --Sampo
 # 8.12.2002, more patched from Luis, --Sampo
+# 23.9.2004, applied bind ip patch from Igor Ivoilov <igor@_francoudi.com> --Sampo
+# 29.4.2005, applied patch from Kristian Nielsen <kn_@@sifira..dk> --Sampo
 #
-# $Id: SMPP.pm,v 1.25 2002/12/08 19:04:36 sampo Exp $
+# $Id: SMPP.pm,v 1.26 2005/03/29 19:23:20 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -46,7 +48,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.03';
+$VERSION = '1.04';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -1435,7 +1437,6 @@ sub encode_submit_multi_resp {
 
     for (my $i=1; $i <= $#_; $i+=2) {
 	next if !defined $_[$i];
-	#warn "$i:>>>$_[$i]<<<";
 	if ($_[$i] eq 'message_id') { $message_id = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'dest_addr_ton')   {
 	    @dest_addr_ton = ref($_[$i+1]) ? @{scalar(splice @_,$i,2,undef,undef)}
@@ -1477,7 +1478,6 @@ sub encode_submit_sm_resp_v4 {
     
     for (my $i=1; $i <= $#_; $i+=2) {
 	next if !defined $_[$i];
-	#warn "$i:>>>$_[$i]<<<";
 	if ($_[$i] eq 'message_id') { $message_id = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'sc_msg_reference') { $message_id = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'dest_addr_ton')   {
@@ -2161,7 +2161,8 @@ sub new_connect {
          PeerAddr => $host,
 	 PeerPort => exists $arg{port} ? $arg{port} : Default->{port},
 	 Proto    => 'tcp',
-	 Timeout  => exists $arg{timeout} ? $arg{timeout} : Default->{timeout})
+	 Timeout  => exists $arg{timeout} ? $arg{timeout} : Default->{timeout},
+			      @_)  # pass any extra args to constructor
 	or return undef;
     
     for my $a (keys %{&Default}) {
@@ -2338,14 +2339,14 @@ sub read_hard {
 	$n = $me->read($$dr, $len-$n, $n+$offset);
 	if (!defined($n)) {
 	    warn "error reading header from socket: $!";
-	    $me->{smpperror} = "read_hard I/O error: $!";
-	    $me->{smpperrorcode} = 1;
+	    ${*$me}{smpperror} = "read_hard I/O error: $!";
+	    ${*$me}{smpperrorcode} = 1;
 	    return undef;
 	}
 	if (!$n) {
 	    warn "premature eof reading from socket";
-	    $me->{smpperror} = "read_hard premature eof";
-	    $me->{smpperrorcode} = 2;
+	    ${*$me}{smpperror} = "read_hard premature eof";
+	    ${*$me}{smpperrorcode} = 2;
 	    return undef;
 	}
     }
@@ -2369,16 +2370,16 @@ sub read_pdu {
      $pdu->{reserved}) = unpack ${*$me}{head_templ}, $header;
     if ($len < $head_len) {
 	warn "Too short length $len < ${*$me}{head_len}, cmd=$pdu->{cmd}, status=$pdu->{status}, seq=$pdu->{seq}";
-        $me->{smpperror} = "read_pdu: Too short length $len < ${*$me}{head_len}, cmd=$pdu->{cmd}, status=$pdu->{status}, seq=$pdu->{seq}";
-        $me->{smpperrorcode} = 3;
+        ${*$me}{smpperror} = "read_pdu: Too short length $len < ${*$me}{head_len}, cmd=$pdu->{cmd}, status=$pdu->{status}, seq=$pdu->{seq}";
+        ${*$me}{smpperrorcode} = 3;
 	return undef;
     }
     warn "read Header:\n".hexdump($header, "\t") if $trace;
     
     $len -= $head_len;
     $me->read_hard($len, \$pdu->{data}, 0) or do {
-        $me->{smpperror} = "read_pdu: invalid length cmd=$pdu->{cmd},status=$pdu->{status}, seq=$pdu->{seq}";
-        $me->{smpperrorcode} = 3;
+        ${*$me}{smpperror} = "read_pdu: invalid length cmd=$pdu->{cmd},status=$pdu->{status}, seq=$pdu->{seq}";
+        ${*$me}{smpperrorcode} = 3;
         return undef;
     };
     warn "read Body:\n".hexdump($pdu->{data}, "\t") if $trace;
@@ -2536,8 +2537,8 @@ implementing more of the message flow logic in his own application.
 In synchronous mode request PDU methods return a Net::SMPP::PDU object
 representing the response, if all went well protocolwise, or undef if
 there was a protocol level error. If undef was returned, the reason
-for the failure can be extracted from $smpp->{smpperror} and
-$smpp->{smpperrorcode} (actual codes are undocumented at the moment,
+for the failure can be extracted from ${*$smpp}{smpperror} and
+${*$smpp}{smpperrorcode} (actual codes are undocumented at the moment,
 but are guaranteed not to change) variables and the global variable
 $!. These variables are meaningless if anything else than undef was
 returned. The response itself may be an error response if there was an

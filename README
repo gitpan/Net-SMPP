@@ -3,7 +3,8 @@ README for Net::SMPP Perl module
 12.3.2001, Sampo Kellomaki <sampo@symlabs.com>
 7.7.2001,  added SMPP 4.0 support --Sampo
 28.9.2001, fleshed out the readme --Sampo
-$Id: README,v 1.6 2001/09/28 20:50:25 sampo Exp $
+29.4.2005, a small update --Sampo
+$Id: README,v 1.7 2005/03/29 19:23:20 sampo Exp $
 
 This readme describes version 0.92 of the module,
 implementing SMPP 3.4 and SMPP 4.0.
@@ -15,6 +16,19 @@ WARNING: This is still highly experimental code. Some of the V4.0
   understand SMPP, please submit bug reports and preferrably
   patches. I am also very interested in success/failure reports on
   testing different features against real world SMSCs.
+
+That being said, version 1.03 was in use for over two years by
+multiple sites, thus I guess some stability and correctness is
+implied. Current version as of 29.4.2005 is 1.04. Given that the
+release cycles have been in multiple years, people have asked if its
+maintained at all. Yes its maintained by me, but only to fix bugs. No
+new development has been done in ages. I guess this is a stable piece
+of software so not many updates are needed. If someone wants to start
+new big project to overhaul this code base and significantly add to
+it, you are welcome.
+
+Introduction
+------------
 
 Net::SMPP is an implementation of Short Message Peer to Peer protocol
 over TCP. This protocol is frequently used in the telecoms and mobile
@@ -153,7 +167,7 @@ License
 -------
 
 Net::SMPP is copyright (c) 2001 by Sampo Kellomaki (sampo@symlabs.com),
-All rights reserved. Portions copyright (c) 2001 by SymLABS
+All rights reserved. Portions copyright (c) 2001-2005 by Symlabs
 (symlabs@symlabs.com), All rights reserved.  You may use
 and distribute Net::SMPP under same terms as perl itself.
 

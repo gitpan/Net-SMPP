@@ -27,3 +27,7 @@ Revision history for Perl extension Net::SMPP.
       Applied some patched by Luis Munoz <lem@@cantv.net> --Sampo
 1.03  8.12.2002
       Another iteration pf patches from Luis Munoz --Sampo
+1.04  29.4.2005
+      * patch from Kristian Nielsen <kn_@@sifira..dk> --Sampo
+
+Note: exact change logs are kept in CVS
