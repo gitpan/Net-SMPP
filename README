@@ -4,28 +4,34 @@ README for Net::SMPP Perl module
 7.7.2001,  added SMPP 4.0 support --Sampo
 28.9.2001, fleshed out the readme --Sampo
 29.4.2005, a small update --Sampo
+21.4.2006, upgrade to 1.10 --Sampo
 $Id: README,v 1.7 2005/03/29 19:23:20 sampo Exp $
 
-This readme describes version 0.92 of the module,
+This readme describes version 1.10 of the module,
 implementing SMPP 3.4 and SMPP 4.0.
 
-WARNING: This is still highly experimental code. Some of the V4.0
-  features have been tested against real world SMSC. Version 3.4 has
-  only been tested against this module itself. Please, if you do not
-  know what you are doing, don't ask me to teach how SMPP works. If you
-  understand SMPP, please submit bug reports and preferrably
-  patches. I am also very interested in success/failure reports on
-  testing different features against real world SMSCs.
+WARNING: Some of the V4.0 features have been tested against real
+  world SMSC. Version 3.4 has only been tested by author against the
+  module itself. However, the author is aware of more than 20
+  productions sites using the code more or less successfully on basis
+  of SMPP-3.4 protocol. I guess Net::SMPP has passed the test of
+  time and is useful in production, though, no doubt, many
+  poorly tested features remain.
 
-That being said, version 1.03 was in use for over two years by
+Version 1.03 was in use for over two years by
 multiple sites, thus I guess some stability and correctness is
-implied. Current version as of 29.4.2005 is 1.04. Given that the
+implied. Current version as of 21.4.2006 is 1.10. Given that the
 release cycles have been in multiple years, people have asked if its
 maintained at all. Yes its maintained by me, but only to fix bugs. No
 new development has been done in ages. I guess this is a stable piece
 of software so not many updates are needed. If someone wants to start
 new big project to overhaul this code base and significantly add to
 it, you are welcome.
+
+Please, if you do not know what you are doing, don't ask me to teach
+how SMPP works. If you understand SMPP, please submit bug reports and
+preferrably patches. I am also very interested in success/failure
+reports on testing different features against real world SMSCs.
 
 Introduction
 ------------
@@ -39,26 +45,21 @@ and american CDMA based systems. The SMPP protocol is documented at
 	www.smpp.org
 
 This module aims at fully implementing version 3.4 of the
-protocol. During the 0.xx version series the implementation will still
-be incomplete or may contain parts that are implemented but never
-tested. Read comments in the source to see if testing has been
-done. If you test a previusly untested PDU (protocol data unit),
-please report success, failure, or difficulties to the author.
+protocol. This module also implements 4.0 and aims to support it fully
+as well. The 4.0 code is based on documentation freely obtained from
+Logica (i.e. not under NDA). (It seems 4.0 is only in use in Japan -
+the rest of the world seems to use 3.4.)
 
-This module also implements 4.0 and aims to support it fully as
-well. The 4.0 code is based on documentation freely obtained
-from Logica (i.e. not under NDA).
-
-SymLABS (www.symlabs.com) uses this module in real life product
+Symlabs (www.symlabs.com) uses this module in real life product
 development. Despite our commercial objectives, we have decided
 to make this module available to public in the belief that
 
-	- someone else will benefit from it and thus will
-	  help us debug and improve it
-	- we promote better sharing of information about
-	  specifications and commonly encountered usage
-	  patterns (which may not always be 100% in spec)
-	- open distribution protects our client's interests
+- someone else will benefit from it and thus will
+  help us debug and improve it
+- we promote better sharing of information about
+  specifications and commonly encountered usage
+  patterns (which may not always be 100% in spec)
+- open distribution protects our client's interests
 
 We are committed to keep this module under license substantially
 similar to the one under which the present release is offered and hope

@@ -1,5 +1,5 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
-# Copyright (c) 2001 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
+# Copyright (c) 2001-2006 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
 # Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
@@ -25,8 +25,10 @@
 # 8.12.2002, more patched from Luis, --Sampo
 # 23.9.2004, applied bind ip patch from Igor Ivoilov <igor@_francoudi.com> --Sampo
 # 29.4.2005, applied patch from Kristian Nielsen <kn_@@sifira..dk> --Sampo
+# 21.4.2006, applied sysread patch from Dziugas.Baltrunas@bite..lt. Similar
+#            patch was also proposed by Felix Gaehtgens <felix@symlabs..com> --Sampo
 #
-# $Id: SMPP.pm,v 1.26 2005/03/29 19:23:20 sampo Exp $
+# $Id: SMPP.pm,v 1.28 2006/04/21 17:48:26 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -48,7 +50,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.04';
+$VERSION = '1.10';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -542,8 +544,7 @@ sub req_backend {
 
     warn "req Header:\n".hexdump($header,"\t") if $trace;
     warn "req Body:\n".hexdump($data,"\t") if $trace;
-    $me->print($header.$data);
-    $me->flush;
+    $me->syswrite($header.$data);
     return $seq if $async;
     
     # Synchronous operation: wait for response
@@ -580,8 +581,7 @@ sub resp_backend {
 
     warn "resp Header:\n".hexdump($header, "\t") if $trace;
     warn "resp Body:\n".hexdump($data, "\t") if $trace;
-    $me->print($header.$data);
-    $me->flush;
+    $me->syswrite($header.$data);
     return $seq;
 }
 
@@ -2336,7 +2336,7 @@ sub read_hard {
     while (length($$dr) < $len+$offset) {
 	my $n = length($$dr) - $offset;
 	#warn "read $n/$len";
-	$n = $me->read($$dr, $len-$n, $n+$offset);
+	$n = $me->sysread($$dr, $len-$n, $n+$offset);
 	if (!defined($n)) {
 	    warn "error reading header from socket: $!";
 	    ${*$me}{smpperror} = "read_hard I/O error: $!";

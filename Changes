@@ -29,5 +29,32 @@ Revision history for Perl extension Net::SMPP.
       Another iteration pf patches from Luis Munoz --Sampo
 1.04  29.4.2005
       * patch from Kristian Nielsen <kn_@@sifira..dk> --Sampo
+      * SImilar patch was submitted by Maxim.Burenko@kyivstar..net
+1.05  xx.x.2005
+      * never publicly distributed
+      * patch from Igor Ivolov to permit binding to specific interface
+1.10  21.4.2006
+      * sysread patch from Dziugas.Baltrunas@bite..lt. This patch improves
+        select compatibility of Net::SMPP. Similar patch was also
+        proposed by Felix Gaehtgens <felix@symlabs..com>. I conseder
+        both addressed now. --Sampo
 
 Note: exact change logs are kept in CVS
+
+Interested readers:
+Paul Morris <paul.morris@totalise.co.uk>
+Chia-liang Kao <clkao@clkao.org>
+Roland Giersig <r.giersig@xsoft.at>
+"Tony Clark" <clarktony@hotmail.com>
+"Andres Maduro" <andres@iconos.com.ve>
+Richard Morgan <Richard@webcom.com.au>
+"Artem Zotov" <zot_aa@inform-mobil.ru>
+lars@thegler.dk
+Ismael Briones <ismael@el-mundo.net>
+lem@cantv.net
+kn@sifira.dk
+Luis Munoz <len@cantv.net>
+Dziugas.Baltrunas@bite.lt
+Maxim.Burenko@kyivstar.net
+
+paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net
