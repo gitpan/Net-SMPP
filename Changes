@@ -38,6 +38,9 @@ Revision history for Perl extension Net::SMPP.
         select compatibility of Net::SMPP. Similar patch was also
         proposed by Felix Gaehtgens <felix@symlabs..com>. I conseder
         both addressed now. --Sampo
+1.11  17.7.2007
+      * enquire_link patch from Matthias Meyser <Meyser@xenet.,de>
+      * Documented message encoding
 
 Note: exact change logs are kept in CVS
 
@@ -56,5 +59,6 @@ kn@sifira.dk
 Luis Munoz <len@cantv.net>
 Dziugas.Baltrunas@bite.lt
 Maxim.Burenko@kyivstar.net
+Matthias Meyser <Meyser@xenet.de>
 
-paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net
+paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net, Matthias Meyser <Meyser@xenet.de>

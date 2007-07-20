@@ -1,5 +1,5 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
-# Copyright (c) 2001-2006 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
+# Copyright (c) 2001-2007 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
 # Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
@@ -27,8 +27,9 @@
 # 29.4.2005, applied patch from Kristian Nielsen <kn_@@sifira..dk> --Sampo
 # 21.4.2006, applied sysread patch from Dziugas.Baltrunas@bite..lt. Similar
 #            patch was also proposed by Felix Gaehtgens <felix@symlabs..com> --Sampo
+# 20.7.2007, patch from Matthias Meyser to fix enquiry_link, document 7bit (1.11) --Sampo
 #
-# $Id: SMPP.pm,v 1.28 2006/04/21 17:48:26 sampo Exp $
+# $Id: SMPP.pm,v 1.29 2006/04/21 20:14:03 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -50,7 +51,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.10';
+$VERSION = '1.11';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -353,10 +354,12 @@ use constant Default => {
 ### handled during wait_pdu() (as opposed to being discarded).
 ### they are called as
 ###        $smpp->handler($pdu);
+### N.B. because the command number is constant, a comma must be used as separator
+###      to prevent interpretation as string. (Thanks Matthias Meyser for pointing this out.)
 
   handlers => {
-	CMD_enquire_link => \&handle_enquire_link,
-	CMD_enquire_link_v4 => \&handle_enquire_link,  #4
+	CMD_enquire_link, \&handle_enquire_link,
+	CMD_enquire_link_v4, \&handle_enquire_link,  #4
     }, 
 };
 
@@ -3154,6 +3157,51 @@ Response PDUs do not have separate asynchronous behaviour pattern.
 
 =back
 
+=head1 MESSAGE ENCODING AND LENGTH
+
+=over 4
+
+Many SMS technologies have inherent message length limits. For example
+GSM specifies length to be 140 bytes. Using 7 bit encoding, this holds
+the 160 characters that people are familiar with. Net::SMPP does not
+enforce this limit in any way, i.e. if you create too long message,
+then it is your problem. You should at application layer make sure
+you stay within limits.
+
+Net::SMPP also does not automatically perform the encoding, not even
+if you set data_encoding parameter. Application layer is responsible
+for performing the encoding and setting the data_encoding parameter
+accordingly.
+
+To assist in performing the usual 7 bit encoding, following functions
+are provided (but you have to call them explicitly):
+
+=over
+
+=item pack_7bit()
+
+=item unpack_7bit()
+
+Example
+
+   $resp_pdu = $smpp->submit_sm(destination_addr => '+447799658372',
+                                data_encoding => 0x00,
+				short_message => pack_7bit('test message'))
+      or die;
+
+=back
+
+The rationale for leaving encoding and length issues at application
+layer is two fold: 1. often the data is just copied through to another
+message or protocol, thus we do not really care how it is encoded or
+how long it is. Presumably it was valid at origin. 2. This policy
+avoids underlying technology dependencies in the module. Often local
+deployments have all the manner of hacks that make this area very
+difficult to chart. So I leave it to local application developer to
+find out what is locally needed.
+
+=back
+
 =head1 OTHER METHODS
 
 =over 4
@@ -3324,9 +3372,9 @@ To create version 4 connection, you must specify smpp_version => 0x40
 and you should not bind as transciever as that is not supported by the
 specification.
 
-As v3.4 specifications seem more mature, I recommend that where attributes
+As v3.4 specification seems more mature, I recommend that where attributes
 have been renamed between v4 and v3.4 you stick to using v3.4 names. I
-have tried to provide compatibility code where ever possible.
+have tried to provide compatibility code whenever possible.
 
 #4#end
 
@@ -3334,9 +3382,9 @@ have tried to provide compatibility code where ever possible.
 
 Unless you wrote your program to be multithreaded or
 multiprocess, everything will happen in one thread of execution.
-Thus if you get unbind while doing somehting else (e.g. checking
-your directory), it stays in operating system level buffers until
-you actually call read_pdu(). Thus knowing it or not is of little
+Thus if you get unbind while doing something else (e.g. checking
+your spool directory), it stays in operating system level buffers until
+you actually call read_pdu(). Knowing about unbind or not is of little
 use. You can write your program to assume the network traffic arrives
 only exactly when you call read_pdu().
 
@@ -3356,7 +3404,7 @@ read_pdu() would block, then you have two possible solutions:
 	   for sending and one for receiving) so that you
 	   can afford to block
 
-The above two tricks are not specific to my module. Consult any standard
+The above two tricks are not specific to this module. Consult any standard
 text book on TCP/IP network programming.
 
 =head1 ERRORS
@@ -3388,8 +3436,8 @@ Interoperates with itself.
 
 Sampo Kellomaki <sampo@symlabs.com>
 
-Net::SMPP is copyright (c) 2001 by Sampo Kellomaki, All rights reserved.
-Portions copyright (c) 2001 by Symlabs, All rights reserved.
+Net::SMPP is copyright (c) 2001-2007 by Sampo Kellomaki, All rights reserved.
+Portions copyright (c) 2001-2005 by Symlabs, All rights reserved.
 You may use and distribute Net::SMPP under same terms as perl itself.
 
 NET::SMPP COMES WITH ABSOLUTELY NO WARRANTY.
@@ -3404,8 +3452,6 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 =over 4
 
 =item test.pl from this package
-
-=item www.smpp.org
 
 =item Short Message Peer to Peer Protocol Specification v3.4, 12-Oct-1999, Issue 1.2
 
@@ -3422,6 +3468,14 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 =item http://www.mobilesms.com/developers.asp
 
 =item http://opensmpp.logica.com
+
+=item www.smpp.org (it appears as of July 2007 domain squatters have taken over the site and it is no longer useful)
+
+=item http://freshmeat.net/projects/netsmpp/ (announcements about Net::SMPP)
+
+=item http://mercnet.pt/Net_SMPP/net-smpp.html (home page)
+
+=item http://cpan.org/modules/by-module/Net/Net-SMPP-1.11.tar.gz (download from CPAN)
 
 =item perl(1)
 

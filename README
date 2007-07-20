@@ -5,7 +5,7 @@ README for Net::SMPP Perl module
 28.9.2001, fleshed out the readme --Sampo
 29.4.2005, a small update --Sampo
 21.4.2006, upgrade to 1.10 --Sampo
-$Id: README,v 1.7 2005/03/29 19:23:20 sampo Exp $
+$Id: README,v 1.8 2006/04/21 20:14:03 sampo Exp $
 
 This readme describes version 1.10 of the module,
 implementing SMPP 3.4 and SMPP 4.0.
