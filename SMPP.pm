@@ -28,8 +28,12 @@
 # 21.4.2006, applied sysread patch from Dziugas.Baltrunas@bite..lt. Similar
 #            patch was also proposed by Felix Gaehtgens <felix@symlabs..com> --Sampo
 # 20.7.2007, patch from Matthias Meyser to fix enquiry_link, document 7bit (1.11) --Sampo
+# 14.12.2008, adapted to SMPPv50, thanks to Gema niskazhu (and curse to
+#             the spec authors for not letting me know about new version) --Sampo
 #
-# $Id: SMPP.pm,v 1.29 2006/04/21 20:14:03 sampo Exp $
+# Why ${*$me}{async} vs. $me->async ?
+#
+# $Id: SMPP.pm,v 1.31 2008-12-02 16:41:30 sampo Exp $
 
 ### The comments often refer to sections of the following document
 ###   Short Message Peer to Peer Protocol Specification v3.4,
@@ -51,7 +55,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.11';
+$VERSION = '1.12';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -364,6 +368,7 @@ use constant Default => {
 };
 
 ### Optional parameter tags, see sec 5.3.2, Table 5-7, pp.132-133
+### See also Sec 4.8.1 "TLV Tag", Table 4-60 "TLV Tag Definitions", pp. 135-137
 
 use constant param_tab => {
     0x0005 => { name => 'dest_addr_subunit',    technology => 'GSM', },
@@ -414,7 +419,30 @@ use constant param_tab => {
     0x0425 => { name => 'delivery_failure_reason', technology => 'Generic', },
     0x0426 => { name => 'more_messages_to_send',   technology => 'GSM', },
     0x0427 => { name => 'message_state',    technology => 'Generic', },
+    0x0428 => { name => 'congestion_state', technology => 'Generic', },
+
     0x0501 => { name => 'ussd_service_op',  technology => 'GSM (USSD)', },
+
+    0x0600 => { name => 'broadcast_channel_indicator',  technology => 'GSM', },
+    0x0601 => { name => 'broadcast_content_type',       technology => 'CDMA, TDMA, GSM', },
+    0x0602 => { name => 'broadcast_content_type_info',  technology => 'CDMA, TDMA', },
+    0x0603 => { name => 'broadcast_message_class',      technology => 'GSM', },
+    0x0604 => { name => 'broadcast_rep_num',            technology => 'GSM', },
+    0x0605 => { name => 'broadcast_frequency_interval', technology => 'CDMA, TDMA, GSM', },
+    0x0606 => { name => 'broadcast_area_identifier',    technology => 'CDMA, TDMA, GSM', },
+    0x0607 => { name => 'broadcast_error_status',       technology => 'CDMA, TDMA, GSM', },
+    0x0608 => { name => 'broadcast_area_success',       technology => 'GSM', },
+    0x0609 => { name => 'broadcast_end_time',           technology => 'CDMA, TDMA, GSM', },
+    0x060a => { name => 'broadcast_service_group',      technology => 'CDMA, TDMA', },
+    0x060b => { name => 'billing_identification',       technology => 'Generic', },
+    0x060d => { name => 'source_network_id',            technology => 'Generic', },
+    0x060e => { name => 'dest_network_id',              technology => 'Generic', },
+    0x060f => { name => 'source_node_id',               technology => 'Generic', },
+    0x0610 => { name => 'dest_node_id',                 technology => 'Generic', },
+    0x0611 => { name => 'dest_addr_np_resolution',      technology => 'CDMA, TDMA (US Only)', },
+    0x0612 => { name => 'dest_addr_np_information',     technology => 'CDMA, TDMA (US Only)', },
+    0x0613 => { name => 'dest_addr_np_country',         technology => 'CDMA, TDMA (US Only)', },
+
     0x1201 => { name => 'display_time',     technology => 'CDMA,TDMA', },  # IS136_DisplayTime
     0x1203 => { name => 'sms_signal',       technology => 'TDMA', },
     0x1204 => { name => 'ms_validity',      technology => 'CDMA,TDMA', },
@@ -425,6 +453,14 @@ use constant param_tab => {
     0x130c => { name => 'alert_on_message_delivery', technology => 'CDMA', },
     0x1380 => { name => 'its_reply_type',   technology => 'CDMA', },
     0x1383 => { name => 'its_session_info', technology => 'CDMA Korean [KORITS]', },
+
+    # from http://docs.roottori.fi/display/MSGAPI/SMPP+commands
+    # On the other hand, http://sms-clearing.com/downloads/gateway/7_SMPP.pdf
+    # lists tag 0x1403 as holding both MCC and MNC in format "MCC/MNC"
+    0x1402 => { name => 'operator_id', technology => 'vendor extension', },
+    0x1403 => { name => 'tariff', technology => 'Mobile Network Code vendor extension', },
+    0x1450 => { name => 'mcc', technology => 'Mobile Country Code vendor extension', },
+    0x1451 => { name => 'mnc', technology => 'Mobile Network Code vendor extension', },
 
     0x1101 => { name => 'PDC_MessageClass', technology => '? (J-Phone)', },  # V4ext p.75  #4
     # "\x20\x00"  0x2000   Sky Mail (service name of J-Phone SMS)  #4
@@ -2301,7 +2337,9 @@ sub message_id {
 
 sub status {
     my $me = shift;
-    return ${*$me}{status};
+    return $me->{status};
+    #return ${$me}{status};
+    #return ${*$me}{status};
 }
 
 sub seq {
@@ -2466,6 +2504,8 @@ sub unpack_7bit {
     return $s;
 #    return pack 'b*', $s;
 }
+
+# "Gema niskazhu" <gemochka@gmail.com>
 
 1;
 __END__
@@ -3470,6 +3510,10 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 =item http://opensmpp.logica.com
 
 =item www.smpp.org (it appears as of July 2007 domain squatters have taken over the site and it is no longer useful)
+
+=item http://www.smsforum.net/  -- New place for info (as of 20081214). However, this page announces the death of itself as of July 27, 2007. Great. The SMS folks really do not want anyone to implement their protocols from specifications.
+
+=item "Short Message Peer to Peer Protocol Specification v5.0 19-February-2003", http://www.csoft.co.uk/documents/smppv50.pdf (good as of 20081214)
 
 =item http://freshmeat.net/projects/netsmpp/ (announcements about Net::SMPP)
 

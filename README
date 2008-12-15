@@ -5,10 +5,11 @@ README for Net::SMPP Perl module
 28.9.2001, fleshed out the readme --Sampo
 29.4.2005, a small update --Sampo
 21.4.2006, upgrade to 1.10 --Sampo
+14.12.2008, added SMPP 5.0 support --Sampo
 $Id: README,v 1.8 2006/04/21 20:14:03 sampo Exp $
 
 This readme describes version 1.10 of the module,
-implementing SMPP 3.4 and SMPP 4.0.
+implementing SMPP 3.4, SMPP 4.0, and SMPP 5.0.
 
 WARNING: Some of the V4.0 features have been tested against real
   world SMSC. Version 3.4 has only been tested by author against the

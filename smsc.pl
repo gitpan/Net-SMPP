@@ -4,7 +4,7 @@
 # See README for license. NO WARRANTY.
 #
 # 10.7.2001, Sampo Kellomaki <sampo@iki.fi>
-# $Id: smsc.pl,v 1.10 2002/02/11 16:41:38 sampo Exp $
+# $Id: smsc.pl,v 1.11 2007-07-20 16:39:19 sampo Exp $
 #
 # SMSC - Short Message Service Center
 #
