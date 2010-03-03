@@ -1,5 +1,5 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
-# Copyright (c) 2001-2007 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
+# Copyright (c) 2001-2009 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
 # Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
@@ -55,7 +55,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.12';
+$VERSION = '1.13';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -145,7 +145,7 @@ do {
     for my $k (keys(%{&status_code}))
     {
 	eval { *{status_code->{$k}->{code}}        = sub { return $k; } };
-        eval { *{status_code->{$k}->{code}.'_msg'} = sub { return $k; } };
+        eval { *{status_code->{$k}->{code}.'_msg'} = sub { return *{status_code->{$k}->{msg}; } };
     }
 };
 
@@ -293,7 +293,7 @@ use constant Default => {
   port => 2255,        # TCP port
   timeout => 5,        # Connection establishment timeout
   listen => 120,       # size of listen queue for new_listen()
-  mode => Transceiver, # Chooses type of bind #4> (Transciever is illegal for v4) <4#
+  mode => Transceiver, # Chooses type of bind #4> (Transceiver is illegal for v4) <4#
 
 ### Version dependent defaults. Mainly these are used to handle different     #4
 ### message header formats between v34 and v4 in a consistent way. Generally  #4
@@ -547,7 +547,13 @@ sub encode_optional_params {
 	if ($param_by_name{$opt_param}) {
 	    $data .= pack 'nna*', $param_by_name{$opt_param}, length($val), $val;
 	} elsif ($opt_param =~ /^\d+$/) {  # specification by numeric tag
-	    $data .= pack 'nna*', $opt_param, , length($val), $val;
+	    if ($val > -128 && $val < 127) {
+		$data .= pack 'nnc', $opt_param, 1, $val;
+	    } elsif ($val > -32768 && $val < 32767) {
+		$data .= pack 'nnn!', $opt_param, 2, $val;
+	    } else {
+		$data .= pack 'nnN!', $opt_param, 4, $val;
+	    }
 	} else {
 	    warn "Unknown optional parameter `$opt_param', skipping";
 	}
@@ -2517,7 +2523,7 @@ Net::SMPP - pure Perl implementation of SMPP 3.4 over TCP
 =head1 SYNOPSIS
 
   use Net::SMPP;
-  $smpp = Net::SMPP->new_transciever($host, port=>$port,
+  $smpp = Net::SMPP->new_transceiver($host, port=>$port,
 			system_id => 'yourusername',
 			password  => 'secret',
 			) or die;
@@ -2568,7 +2574,7 @@ they are either handled by handlers (set up by constructor) or
 discarded. Both command code and sequence number must match. Typically
 a handler for enquire command is set up while all other commands are
 silently dropped. This practise may not be very suitable for
-transciever mode of operation and certainly is not suitable for
+transceiver mode of operation and certainly is not suitable for
 implementing a SMSC.
 
 Synchronous operation makes it impossible to interleave SMPP
@@ -2652,7 +2658,7 @@ Create a new SMPP client object and open conncetion to SMSC host
        ) or die;
 
 Usually this constructor is not called directly. Use
-new_transciever(), new_transmitter(), and new_receiver() instead.
+new_transceiver(), new_transmitter(), and new_receiver() instead.
 
 =item new_transceiver()
 
@@ -3286,7 +3292,7 @@ set in tandem.
 Typical client:
 
   use Net::SMPP;
-  $smpp = Net::SMPP->new_transciever('smsc.foo.net', Port=>2552) or die;
+  $smpp = Net::SMPP->new_transceiver('smsc.foo.net', port=>2552) or die;
   $resp_pdu = $smpp->submit_sm(desination_addr => '447799658372',
 			       data => 'test message') or die;
   ***
@@ -3311,7 +3317,7 @@ that has already been implemented):
 1. A reserved (always 0x00000000) field in message
    header (v4 p. 21) (ok)
 
-2. Connection can not be opened in transciever mode (this
+2. Connection can not be opened in transceiver mode (this
    module will not enforce this restriction) (ok)
 
 3. Command versioning. Version 0x01 == V4 (v4 p. 22) (ok)
@@ -3402,14 +3408,14 @@ that has already been implemented):
 
 39. replace_sm: sm_length field increased from one to two bytes (ok)
 
-40. In v3.4 command code 0x0009 means bind_transciever,
+40. In v3.4 command code 0x0009 means bind_transceiver,
     in v4.0 this very same code means delivery_receipt (bummer) (ok)
 
 41. In v3.4 enquire_link is 0x0015 where as in v4 it is 0x000a (ok)
 
 
 To create version 4 connection, you must specify smpp_version => 0x40
-and you should not bind as transciever as that is not supported by the
+and you should not bind as transceiver as that is not supported by the
 specification.
 
 As v3.4 specification seems more mature, I recommend that where attributes
@@ -3517,9 +3523,9 @@ This work was sponsored by Symlabs, the LDAP and directory experts
 
 =item http://freshmeat.net/projects/netsmpp/ (announcements about Net::SMPP)
 
-=item http://mercnet.pt/Net_SMPP/net-smpp.html (home page)
+=item http://zxid.org/smpp/net-smpp.html (home page)
 
-=item http://cpan.org/modules/by-module/Net/Net-SMPP-1.11.tar.gz (download from CPAN)
+=item http://cpan.org/modules/by-module/Net/Net-SMPP-1.12.tar.gz (download from CPAN)
 
 =item perl(1)
 

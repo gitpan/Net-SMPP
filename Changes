@@ -41,24 +41,9 @@ Revision history for Perl extension Net::SMPP.
 1.11  17.7.2007
       * enquire_link patch from Matthias Meyser <Meyser@xenet.,de>
       * Documented message encoding
+1.12  15.12.2008
+
+1.13  3.3.2010
+      * Fixed numerical value case in encode_optional_params()
 
 Note: exact change logs are kept in CVS
-
-Interested readers:
-Paul Morris <paul.morris@totalise.co.uk>
-Chia-liang Kao <clkao@clkao.org>
-Roland Giersig <r.giersig@xsoft.at>
-"Tony Clark" <clarktony@hotmail.com>
-"Andres Maduro" <andres@iconos.com.ve>
-Richard Morgan <Richard@webcom.com.au>
-"Artem Zotov" <zot_aa@inform-mobil.ru>
-lars@thegler.dk
-Ismael Briones <ismael@el-mundo.net>
-lem@cantv.net
-kn@sifira.dk
-Luis Munoz <len@cantv.net>
-Dziugas.Baltrunas@bite.lt
-Maxim.Burenko@kyivstar.net
-Matthias Meyser <Meyser@xenet.de>
-
-paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net, Matthias Meyser <Meyser@xenet.de>
