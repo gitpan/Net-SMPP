@@ -46,4 +46,29 @@ Revision history for Perl extension Net::SMPP.
 1.13  3.3.2010
       * Fixed numerical value case in encode_optional_params()
 
+1.14  24.6.2010
+      * upgraded to support more recent perls, probably breaking 5.005 and earlier
+
 Note: exact change logs are kept in CVS
+
+Interested readers:
+Paul Morris <paul.morris@totalise.co.uk>
+Chia-liang Kao <clkao@clkao.org>
+Roland Giersig <r.giersig@xsoft.at>
+"Tony Clark" <clarktony@hotmail.com>
+"Andres Maduro" <andres@iconos.com.ve>
+Richard Morgan <Richard@webcom.com.au>
+"Artem Zotov" <zot_aa@inform-mobil.ru>
+lars@thegler.dk
+Ismael Briones <ismael@el-mundo.net>
+lem@cantv.net
+kn@sifira.dk
+Luis Munoz <len@cantv.net>
+Dziugas.Baltrunas@bite.lt
+Maxim.Burenko@kyivstar.net
+Matthias Meyser <Meyser@xenet.de>
+jose.venceslau@optimus.pt
+Francisco.Viana@optimus.pt
+valyakol@gmail.com
+
+paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net, Matthias Meyser <Meyser@xenet.de>, jose.venceslau@optimus.pt, Francisco.Viana@optimus.pt, valyakol@gmail.com

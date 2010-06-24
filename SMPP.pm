@@ -1,5 +1,5 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
-# Copyright (c) 2001-2009 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
+# Copyright (c) 2001-2010 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
 # Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
@@ -30,6 +30,7 @@
 # 20.7.2007, patch from Matthias Meyser to fix enquiry_link, document 7bit (1.11) --Sampo
 # 14.12.2008, adapted to SMPPv50, thanks to Gema niskazhu (and curse to
 #             the spec authors for not letting me know about new version) --Sampo
+# 24.6.2010, tweaked for perl 5.8.8 --Sampo
 #
 # Why ${*$me}{async} vs. $me->async ?
 #
@@ -55,7 +56,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.13';
+$VERSION = '1.14';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -145,7 +146,7 @@ do {
     for my $k (keys(%{&status_code}))
     {
 	eval { *{status_code->{$k}->{code}}        = sub { return $k; } };
-        eval { *{status_code->{$k}->{code}.'_msg'} = sub { return *{status_code->{$k}->{msg}; } };
+        eval { *{status_code->{$k}->{code}.'_msg'} = sub { return *{status_code->{$k}->{msg}}; } };
     }
 };
 
@@ -459,6 +460,9 @@ use constant param_tab => {
     # lists tag 0x1403 as holding both MCC and MNC in format "MCC/MNC"
     0x1402 => { name => 'operator_id', technology => 'vendor extension', },
     0x1403 => { name => 'tariff', technology => 'Mobile Network Code vendor extension', },
+    # valyakol@gmail.com reports that these should be
+    #0x1402 => { name => 'mBlox_operator', technology => 'Generic', },
+    #0x1403 => { name => 'mBlox_rate', technology => 'Generic', },
     0x1450 => { name => 'mcc', technology => 'Mobile Country Code vendor extension', },
     0x1451 => { name => 'mnc', technology => 'Mobile Network Code vendor extension', },
 
@@ -3482,7 +3486,7 @@ Interoperates with itself.
 
 Sampo Kellomaki <sampo@symlabs.com>
 
-Net::SMPP is copyright (c) 2001-2007 by Sampo Kellomaki, All rights reserved.
+Net::SMPP is copyright (c) 2001-2010 by Sampo Kellomaki, All rights reserved.
 Portions copyright (c) 2001-2005 by Symlabs, All rights reserved.
 You may use and distribute Net::SMPP under same terms as perl itself.
 

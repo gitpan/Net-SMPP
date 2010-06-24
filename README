@@ -6,15 +6,22 @@ README for Net::SMPP Perl module
 29.4.2005, a small update --Sampo
 21.4.2006, upgrade to 1.10 --Sampo
 14.12.2008, added SMPP 5.0 support --Sampo
+24.6.2010,  upgraded to support more recent perls, probably breaking 5.005 and earlier --Sampo
 $Id: README,v 1.8 2006/04/21 20:14:03 sampo Exp $
 
-This readme describes version 1.10 of the module,
+This readme describes version 1.14 of the module,
 implementing SMPP 3.4, SMPP 4.0, and SMPP 5.0.
+
+Version 1.14 attempts to be compatible with perl 5.10. This may cause
+earlier perls, uch as perl 5.005 to break. If you have old perl,
+you should try version 1.13 which explicitly tried to support them
+at the cost of not supporting newer perls (why did perl have to
+change in incompatible ways). At least 1.14 has been tested on 5.8.8.
 
 WARNING: Some of the V4.0 features have been tested against real
   world SMSC. Version 3.4 has only been tested by author against the
   module itself. However, the author is aware of more than 20
-  productions sites using the code more or less successfully on basis
+  production sites using the code more or less successfully on basis
   of SMPP-3.4 protocol. I guess Net::SMPP has passed the test of
   time and is useful in production, though, no doubt, many
   poorly tested features remain.
@@ -72,6 +79,15 @@ To build an entire solution takes much more than just this protocol
 module. We are specialists in integrating various internet and telco
 protocols and building whole solutions. For integration and support
 services, please contact symlabs@symlabs.com
+
+Getting
+-------
+
+	Download from cpan.org
+
+	OR
+
+	git clone git://zxid.org/smpp
 
 Building
 --------
@@ -168,7 +184,7 @@ Benchmark
 License
 -------
 
-Net::SMPP is copyright (c) 2001 by Sampo Kellomaki (sampo@symlabs.com),
+Net::SMPP is copyright (c) 2001,2010 by Sampo Kellomaki (sampo@iki.fi),
 All rights reserved. Portions copyright (c) 2001-2005 by Symlabs
 (symlabs@symlabs.com), All rights reserved.  You may use
 and distribute Net::SMPP under same terms as perl itself.

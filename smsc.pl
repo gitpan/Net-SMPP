@@ -1,5 +1,6 @@
-#!/apps/perl/std/bin/perl
+#!/usr/bin/perl
 #
+# Copyright (c) 2010 Sampo Kellomaki (sampo@iki.fi), All Rights Reserved.
 # Copyright (c) 2001 SymLABS <symlabs@symlabs.com>, All Rights Reserved.
 # See README for license. NO WARRANTY.
 #
@@ -20,7 +21,7 @@ $trace = 0;
 $Net::SMPP::trace = 0;
 $sysid = "GSMSGW";
 $pw = "secret";
-$host = 'cid';
+$host = 'localhost';
 $port = 9900;
 $facil = 0x00010003;
 ($vers) = @ARGV;

@@ -1,4 +1,4 @@
-#!/apps/perl/std/bin/perl
+#!/usr/bin/perl
 #
 # Copyright (c) 2001 SymLABS <symlabs@symlabs.com>, All Rights Reserved.
 # See README for license. NO WARRANTY.
@@ -18,7 +18,7 @@ use Data::Dumper;
 $trace = 1;
 $sysid = "GSMSGW";
 $pw = "secret";
-$host = 'cid';
+$host = 'localhost';
 $port = 9900;
 $facil = 0x00010003;
 ($vers) = @ARGV;
