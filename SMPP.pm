@@ -46,7 +46,7 @@
 
 package Net::SMPP;
 
-require 5.005;
+require 5.008;
 use strict;
 use Socket;
 use Symbol;
@@ -56,7 +56,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.14';
+$VERSION = '1.16';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -295,6 +295,8 @@ use constant Default => {
   timeout => 5,        # Connection establishment timeout
   listen => 120,       # size of listen queue for new_listen()
   mode => Transceiver, # Chooses type of bind #4> (Transceiver is illegal for v4) <4#
+
+  enquire_interval => 0,  # How often enquire PDU is sent during read_hard(). 0 == off
 
 ### Version dependent defaults. Mainly these are used to handle different     #4
 ### message header formats between v34 and v4 in a consistent way. Generally  #4
@@ -578,7 +580,7 @@ sub req_backend {
     
     for (my $i=0; $i <= $#_; $i+=2) {
 	next if !defined $_[$i];
-	if ($_[$i] eq 'async') { $async = splice @_,$i,2,undef,undef; }
+	if ($_[$i] eq 'async')  { $async = splice @_,$i,2,undef,undef; }
 	elsif ($_[$i] eq 'seq')   { $seq = splice @_,$i,2,undef,undef; }
     }
     $async = ${*$me}{async} if !defined $async;
@@ -1250,7 +1252,7 @@ sub encode_submit_resp_v34 {
 	next if !defined $_[$i];
 	if ($_[$i] eq 'message_id') { $message_id = splice @_,$i,2,undef,undef; }
     }
-    
+    warn "message_id=$message_id" if $trace;
     croak "message_id must be supplied" if !defined $message_id;
     return pack('Z*', $message_id);
 }
@@ -2207,10 +2209,11 @@ sub new_connect {
     my %arg = @_;
 
     my $s = $type->SUPER::new(
-         PeerAddr => $host,
-	 PeerPort => exists $arg{port} ? $arg{port} : Default->{port},
-	 Proto    => 'tcp',
-	 Timeout  => exists $arg{timeout} ? $arg{timeout} : Default->{timeout},
+         PeerAddr  => $host,
+	 PeerPort  => exists $arg{port} ? $arg{port} : Default->{port},
+	 LocalAddr => exists $arg{local_ip} ? $arg{local_ip} : Default->{local_ip},
+	 Proto     => 'tcp',
+	 Timeout   => exists $arg{timeout} ? $arg{timeout} : Default->{timeout},
 			      @_)  # pass any extra args to constructor
 	or return undef;
     
@@ -2342,7 +2345,7 @@ package Net::SMPP::PDU;
 
 sub message_id {
     my $me = shift;
-    return ${*$me}{message_id};
+    return $me->{message_id};
 }
 
 sub status {
@@ -2354,26 +2357,26 @@ sub status {
 
 sub seq {
     my $me = shift;
-    return ${*$me}{seq};
+    return $me->{seq};
 }
 
 sub explain_status {
     my $me = shift;
     return sprintf("%s (%s=0x%08X)",
-		   Net::SMPP::status_code->{${*$me}{status}}->{msg},
-		   Net::SMPP::status_code->{${*$me}{status}}->{code},
-		   ${*$me}{status});
+		   Net::SMPP::status_code->{$me->{status}}->{msg},
+		   Net::SMPP::status_code->{$me->{status}}->{code},
+		   $me->{status});
 }
 
 sub cmd {
     my $me = shift;
-    return ${*$me}{cmd};
+    return $me->{cmd};
 }
 
 sub explain_cmd {
     my $me = shift;
-    my $cmd = Net::SMPP::pdu_tab->{${*$me}{cmd}}
-    || { cmd => sprintf(q{Unknown(0x%08X)}, ${*$me}{cmd}) };
+    my $cmd = Net::SMPP::pdu_tab->{$me->{cmd}}
+    || { cmd => sprintf(q{Unknown(0x%08X)}, $me->{cmd}) };
     return $cmd->{cmd};
 }
 
@@ -2386,19 +2389,29 @@ sub read_hard {
     my ($me, $len, $dr, $offset) = @_;
     while (length($$dr) < $len+$offset) {
 	my $n = length($$dr) - $offset;
-	#warn "read $n/$len";
-	$n = $me->sysread($$dr, $len-$n, $n+$offset);
-	if (!defined($n)) {
-	    warn "error reading header from socket: $!";
-	    ${*$me}{smpperror} = "read_hard I/O error: $!";
-	    ${*$me}{smpperrorcode} = 1;
-	    return undef;
-	}
-	if (!$n) {
-	    warn "premature eof reading from socket";
-	    ${*$me}{smpperror} = "read_hard premature eof";
-	    ${*$me}{smpperrorcode} = 2;
-	    return undef;
+	eval {
+	    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+	    alarm ${*$me}{enquire_interval} if ${*$me}{enquire_interval};
+	    warn "read $n/$len enqint(${*$me}{enquire_interval})" if $trace>1;
+	    $n = $me->sysread($$dr, $len-$n, $n+$offset);
+	};
+	if ($@) {
+	    warn "ENQUIRE $@" if $trace;
+	    die unless $@ eq "alarm\n";   # propagate unexpected errors
+	    $me->enquire_link();   # Send a periodic ping
+	} else {
+	    if (!defined($n)) {
+		warn "error reading header from socket: $!";
+		${*$me}{smpperror} = "read_hard I/O error: $!";
+		${*$me}{smpperrorcode} = 1;
+		return undef;
+	    }
+	    if (!$n) {
+		warn "premature eof reading from socket";
+		${*$me}{smpperror} = "read_hard premature eof";
+		${*$me}{smpperrorcode} = 2;
+		return undef;
+	    }
 	}
     }
     #warn "read complete";
@@ -2460,7 +2473,7 @@ sub wait_pdu {
 	}
 	
 	### *** effectively all other PDUs get ignored
-	warn "looking for $look_for_me seq=$seq, skipping $pdu->{cmd} seq=$pdu->{seq}" if $trace;
+	warn "looking for $look_for_me seq=$seq, skipping cmd=$pdu->{cmd} seq=$pdu->{seq}" if $trace;
     }
 }
 

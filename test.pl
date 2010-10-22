@@ -2157,6 +2157,7 @@ if ($listen) {
 	    if (($pdu->{seq} == $seq) && $pdu->{known_pdu}
 		&& ($pdu->{cmd} == 0x8001000a)
 		&& ($pdu->{status} == 0)
+		&& ($pdu->status == 0)
 		) {
 		print "ok 93  (seq=$seq)\n";
 	    } else {
