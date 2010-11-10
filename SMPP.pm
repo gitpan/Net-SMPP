@@ -56,7 +56,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.16';
+$VERSION = '1.18';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -2231,7 +2231,10 @@ sub new_connect {
 sub new_transceiver {
     my $type = shift;
     my $me = $type->new_connect(@_);
+    return undef if !defined $me;
+    warn "Connected, sending bind: ".Dumper($me) if $trace;
     my $resp = $me->bind_transceiver();
+    warn "Bound: ".Dumper($resp) if $trace;
     return ($me, $resp) if wantarray;
     return $me;
 }
@@ -2239,6 +2242,7 @@ sub new_transceiver {
 sub new_transmitter {
     my $type = shift;
     my $me = $type->new_connect(@_);
+    return undef if !defined $me;
     warn "Connected, sending bind: ".Dumper($me) if $trace;
     my $resp = $me->bind_transmitter();
     warn "Bound: ".Dumper($resp) if $trace;
@@ -2249,7 +2253,10 @@ sub new_transmitter {
 sub new_receiver {
     my $type = shift;
     my $me = $type->new_connect(@_);
+    return undef if !defined $me;
+    warn "Connected, sending bind: ".Dumper($me) if $trace;
     my $resp = $me->bind_receiver();
+    warn "Bound: ".Dumper($resp) if $trace;
     return ($me, $resp) if wantarray;
     return $me;
 }
@@ -3310,7 +3317,7 @@ Typical client:
 
   use Net::SMPP;
   $smpp = Net::SMPP->new_transceiver('smsc.foo.net', port=>2552) or die;
-  $resp_pdu = $smpp->submit_sm(desination_addr => '447799658372',
+  $resp_pdu = $smpp->submit_sm(destination_addr => '447799658372',
 			       data => 'test message') or die;
   ***
 
@@ -3321,6 +3328,22 @@ Typical server, run from inetd:
 See test.pl for good templates with all official parameters, but
 beware that the actual parameter values are ficticious as is the flow
 of the dialog.
+
+=head1 MULTIPART MESSAGE
+
+Reportedly (Zeus Panchenko) multipart messages can be gotten to work with
+
+  while (length ($msgtext)) {
+    if ($multimsg_maxparts) {
+      @udh_ar = map { sprintf "%x", $_ } $origref, $multimsg_maxparts, $multimsg_curpart;
+      $udh = pack("hhhhhh",0x05, 0x00, 0x03 , @udh_ar);
+      $resp_pdu = $smpp->submit_sm(destination_addr => $phone,
+                           ...
+                           short_message => $udh . $msgtext,
+                         );
+      ...
+    }
+  }
 
 #4#cut
 =head1 VERSION 4.0 SUPPORT
@@ -3482,8 +3505,6 @@ None by default.
 =head1 TESTS / WHAT IS KNOWN TO WORK
 
 Interoperates with itself.
-
-*** No real interoperability tests have been performed yet
 
 =head1 TO DO AND BUGS
 

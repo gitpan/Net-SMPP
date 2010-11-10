@@ -52,26 +52,14 @@ Revision history for Perl extension Net::SMPP.
 1.16  22.10.2010
       * more patches to support more recent perls from Zeus Panchenko
 
-Note: exact change logs are kept in CVS
+1.17  1.11.2010
+      * Added check for connect failure in new_transciever()
 
-Interested readers:
-Paul Morris <paul.morris@totalise.co.uk>
-Chia-liang Kao <clkao@clkao.org>
-Roland Giersig <r.giersig@xsoft.at>
-"Tony Clark" <clarktony@hotmail.com>
-"Andres Maduro" <andres@iconos.com.ve>
-Richard Morgan <Richard@webcom.com.au>
-"Artem Zotov" <zot_aa@inform-mobil.ru>
-lars@thegler.dk
-Ismael Briones <ismael@el-mundo.net>
-lem@cantv.net
-kn@sifira.dk
-Luis Munoz <len@cantv.net>
-Dziugas.Baltrunas@bite.lt
-Maxim.Burenko@kyivstar.net
-Matthias Meyser <Meyser@xenet.de>
-jose.venceslau@optimus.pt
-valyakol@gmail.com
-zeus.panchenko@gmail.com
+1.18  10.11.2010
+      * Improved connect failure check per patch from Zeus Panchenko
+      * Added multipart message example from Zeus Panchenko
+      * Typo fix from Boris Shomodjvarac
 
-paul.morris@totalise.co.uk, clkao@clkao.org, r.giersig@xsoft.at, clarktony@hotmail.com, andres@iconos.com.ve, Richard@webcom.com.au, zot_aa@inform-mobil.ru, lars@thegler.dk, ismael@el-mundo.net, lem@cantv.net, kn@sifira.dk, len@cantv.net, Dziugas.Baltrunas@bite.lt, Maxim.Burenko@kyivstar.net, Matthias Meyser <Meyser@xenet.de>, jose.venceslau@optimus.pt, valyakol@gmail.com, zeus.panchenko@gmail.com
+Note: exact change logs are kept in git
+
+(See Interested-Readers)
