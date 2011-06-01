@@ -1,5 +1,5 @@
 # Net::SMPP.pm  -  SMPP over TCP, pure perl implementation
-# Copyright (c) 2001-2010 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
+# Copyright (c) 2001-2011 Sampo Kellomaki <sampo@iki.fi>, All rights reserved.
 # Portions Copyright (c) 2001-2005 Symlabs, All rights reserved.
 # This code may be distributed under same terms as perl. NO WARRANTY.
 # Work sponsored by Symlabs, the LDAP and directory experts (www.symlabs.com)
@@ -31,6 +31,7 @@
 # 14.12.2008, adapted to SMPPv50, thanks to Gema niskazhu (and curse to
 #             the spec authors for not letting me know about new version) --Sampo
 # 24.6.2010, tweaked for perl 5.8.8 --Sampo
+# 29.5.2011, improved signal handling in read_hard(), patch from Clemens Dorner --Sampo
 #
 # Why ${*$me}{async} vs. $me->async ?
 #
@@ -56,7 +57,7 @@ use Data::Dumper;  # for debugging
 
 use vars qw(@ISA $VERSION %default %param_by_name $trace);
 @ISA = qw(IO::Socket::INET);
-$VERSION = '1.18';
+$VERSION = '1.19';
 $trace = 0;
 
 use constant Transmitter => 1;  # SMPP transmitter mode of operation
@@ -2400,7 +2401,12 @@ sub read_hard {
 	    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
 	    alarm ${*$me}{enquire_interval} if ${*$me}{enquire_interval};
 	    warn "read $n/$len enqint(${*$me}{enquire_interval})" if $trace>1;
-	    $n = $me->sysread($$dr, $len-$n, $n+$offset);
+	    while (1) {
+		$n = $me->sysread($$dr, $len-$n, $n+$offset);
+		next if $! =~ /^Interrupted/;
+		last;
+	    }
+	    alarm 0;
 	};
 	if ($@) {
 	    warn "ENQUIRE $@" if $trace;

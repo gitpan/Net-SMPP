@@ -60,6 +60,9 @@ Revision history for Perl extension Net::SMPP.
       * Added multipart message example from Zeus Panchenko
       * Typo fix from Boris Shomodjvarac
 
+1.19  29.5.2011
+      * Improved signal handling in read_hard(), patch from Clemens Dorner
+
 Note: exact change logs are kept in git
 
 (See Interested-Readers)
